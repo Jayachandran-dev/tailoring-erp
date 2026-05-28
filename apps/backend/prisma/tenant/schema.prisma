@@ -1,0 +1,229 @@
+// Tenant template schema. Each shop gets its OWN Postgres schema with these tables.
+// At runtime the app instantiates a PrismaClient per tenant pointing at that schema
+// (postgresql://.../db?schema=tenant_<slug>).
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../node_modules/.prisma/tenant-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Placeholder; real URL is injected per-tenant at runtime.
+  url      = env("DATABASE_URL")
+}
+
+model TenantUser {
+  id          String   @id @default(cuid())
+  // Mirrors PlatformUser.id from the platform schema (kept denormalized for fast joins).
+  platformUserId String @unique @map("platform_user_id")
+  mobile      String   @unique
+  displayName String?  @map("display_name")
+  role        String   @default("OWNER")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  mobile    String?
+  email     String?
+  address   String?
+  gender    String?
+  notes     String?
+  imageUrl  String?  @map("image_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  measurements Measurement[]
+  orders       Order[]
+
+  @@index([mobile])
+  @@map("customers")
+}
+
+model Measurement {
+  id          String   @id @default(cuid())
+  customerId  String   @map("customer_id")
+  garmentType String   @default("custom") @map("garment_type") // e.g. shirt, pant, kurta, blouse, salwar, custom
+  label       String?
+  // Free-form JSON of field name -> value (cm/inches)
+  data        Json
+  takenAt     DateTime @default(now()) @map("taken_at")
+  updatedAt   DateTime @updatedAt        @map("updated_at")
+
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@map("measurements")
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  orderNumber   String?     @unique @map("order_number")
+  customerId    String      @map("customer_id")
+  itemType      String?     @map("item_type") // legacy free-form summary (kept nullable)
+  status        OrderStatus @default(PENDING)
+  priority      String      @default("NORMAL") // LOW | NORMAL | HIGH | URGENT
+  priceCents    Int         @default(0) @map("price_cents") // legacy aggregate, retained
+  discountCents Int         @default(0) @map("discount_cents")
+  totalCents    Int         @default(0) @map("total_cents") // sum(items) - discount
+  paidCents     Int         @default(0) @map("paid_cents")  // sum(payments)
+  notes         String?
+  dueDate       DateTime?   @map("due_date")
+  deliveredAt   DateTime?   @map("delivered_at")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  customer      Customer              @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  items         OrderItem[]
+  payments      OrderPayment[]
+  history       OrderStatusHistory[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("orders")
+}
+
+model OrderItem {
+  id                  String   @id @default(cuid())
+  orderId             String   @map("order_id")
+  designId            String?  @map("design_id")
+  measurementId       String?  @map("measurement_id")
+  garmentType         String   @default("custom") @map("garment_type")
+  name                String
+  imageUrl            String?  @map("image_url")
+  qty                 Int      @default(1)
+  unitPriceCents      Int      @default(0) @map("unit_price_cents")
+  measurementSnapshot Json?    @map("measurement_snapshot")
+  notes               String?
+  sortOrder           Int      @default(0) @map("sort_order")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  order               Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model OrderPayment {
+  id            String   @id @default(cuid())
+  orderId       String   @map("order_id")
+  amountCents   Int      @map("amount_cents")
+  method        String   @default("CASH") // CASH | UPI | CARD | BANK | OTHER
+  reference     String?
+  notes         String?
+  paidAt        DateTime @default(now()) @map("paid_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  upiAccountId  String?  @map("upi_account_id")
+
+  order       Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  upiAccount  UpiAccount? @relation(fields: [upiAccountId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([upiAccountId])
+  @@map("order_payments")
+}
+
+model OrderStatusHistory {
+  id         String       @id @default(cuid())
+  orderId    String       @map("order_id")
+  fromStatus OrderStatus? @map("from_status")
+  toStatus   OrderStatus  @map("to_status")
+  note       String?
+  changedAt  DateTime     @default(now()) @map("changed_at")
+
+  order      Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_status_history")
+}
+
+enum OrderStatus {
+  PENDING
+  IN_PROGRESS
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+model DesignCategory {
+  id        String   @id @default(cuid())
+  name      String
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt        @map("updated_at")
+
+  designs   Design[]
+
+  @@map("design_categories")
+}
+
+model Design {
+  id         String   @id @default(cuid())
+  categoryId String   @map("category_id")
+  name       String
+  code       String?
+  priceCents Int      @default(0) @map("price_cents")
+  notes      String?
+  imageUrl   String?  @map("image_url")
+  tags       String?  // comma-separated for quick filter
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt        @map("updated_at")
+
+  category   DesignCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId])
+  @@index([name])
+  @@map("designs")
+}
+
+model UpiAccount {
+  id         String   @id @default(cuid())
+  label      String
+  upiId      String   @map("upi_id")
+  payeeName  String?  @map("payee_name")
+  isDefault  Boolean  @default(false) @map("is_default")
+  isActive   Boolean  @default(true)  @map("is_active")
+  notes      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt        @map("updated_at")
+
+  payments   OrderPayment[]
+
+  @@map("upi_accounts")
+}
+
+model BusinessSettings {
+  id             String   @id @default("default")
+  businessName   String   @default("") @map("business_name")
+  legalName      String?  @map("legal_name")
+  tagline        String?
+  ownerName      String?  @map("owner_name")
+  phone          String?
+  altPhone       String?  @map("alt_phone")
+  email          String?
+  website        String?
+  addressLine1   String?  @map("address_line1")
+  addressLine2   String?  @map("address_line2")
+  city           String?
+  state          String?
+  pincode        String?
+  country        String   @default("India")
+  gstin          String?
+  pan            String?
+  currency       String   @default("INR")
+  timezone       String   @default("Asia/Kolkata")
+  logoUrl         String? @map("logo_url")
+  visitingCardUrl String? @map("visiting_card_url")
+  invoicePrefix   String  @default("ORD-") @map("invoice_prefix")
+  invoiceFooter  String?  @map("invoice_footer")
+  terms          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt        @map("updated_at")
+
+  @@map("business_settings")
+}

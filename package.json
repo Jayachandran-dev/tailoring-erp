@@ -1,0 +1,20 @@
+{
+  "name": "tailoring-erp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Multi-tenant Tailoring ERP (schema-per-tenant, OTP-based mobile auth, PWA).",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm-run-all -p dev:backend dev:frontend",
+    "dev:backend": "npm --workspace apps/backend run dev",
+    "dev:frontend": "npm --workspace apps/frontend run dev",
+    "build": "npm --workspace apps/backend run build && npm --workspace apps/frontend run build",
+    "platform:migrate": "npm --workspace apps/backend run platform:migrate",
+    "tenant:generate": "npm --workspace apps/backend run tenant:generate"
+  },
+  "devDependencies": {
+    "npm-run-all": "^4.1.5"
+  }
+}

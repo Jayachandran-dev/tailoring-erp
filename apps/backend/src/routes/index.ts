@@ -1,0 +1,26 @@
+import { Router } from 'express';
+import authRouter from '../modules/auth/auth.controller';
+import tenantRouter from '../modules/tenant/tenant.controller';
+import customersRouter from '../modules/customers/customers.controller';
+import dashboardRouter from '../modules/dashboard/dashboard.controller';
+import designsRouter from '../modules/designs/designs.controller';
+import designCategoriesRouter from '../modules/designs/designCategories.controller';
+import ordersRouter from '../modules/orders/orders.controller';
+import upiAccountsRouter from '../modules/settings/upi.controller';
+import businessSettingsRouter from '../modules/settings/business.controller';
+
+const router = Router();
+
+router.get('/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
+
+router.use('/auth', authRouter);
+router.use('/tenant', tenantRouter);
+router.use('/customers', customersRouter);
+router.use('/dashboard', dashboardRouter);
+router.use('/design-categories', designCategoriesRouter);
+router.use('/designs', designsRouter);
+router.use('/orders', ordersRouter);
+router.use('/settings/upi-accounts', upiAccountsRouter);
+router.use('/settings/business', businessSettingsRouter);
+
+export default router;

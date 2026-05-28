@@ -1,0 +1,130 @@
+// Platform schema: global registry. Lives in the `platform` PostgreSQL schema.
+// Contains tenants, platform users, OTP requests. NEVER stores per-shop business data.
+
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../../node_modules/.prisma/platform-client"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["platform"]
+}
+
+model Tenant {
+  id           String   @id @default(cuid())
+  // Human-readable shop name
+  name         String
+  // Unique slug used to build the Postgres schema name: tenant_<slug>
+  slug         String   @unique
+  // Resolved schema name on disk, e.g. "tenant_acme"
+  schemaName   String   @unique @map("schema_name")
+  status       TenantStatus @default(ACTIVE)
+  // Owner mobile (E.164). One owner per tenant in the MVP.
+  ownerMobile  String   @map("owner_mobile")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  memberships  TenantMembership[]
+  sessions     Session[]
+
+  @@map("tenants")
+  @@schema("platform")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  PROVISIONING
+
+  @@schema("platform")
+}
+
+// A platform-level identity keyed by mobile number.
+// A single mobile may belong to multiple tenants (e.g. an owner of two shops).
+model PlatformUser {
+  id          String   @id @default(cuid())
+  mobile      String   @unique
+  displayName String?  @map("display_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  memberships TenantMembership[]
+  sessions    Session[]
+
+  @@map("platform_users")
+  @@schema("platform")
+}
+
+model TenantMembership {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  userId     String   @map("user_id")
+  role       Role     @default(OWNER)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant     Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user       PlatformUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@map("tenant_memberships")
+  @@schema("platform")
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  STAFF
+
+  @@schema("platform")
+}
+
+// OTP requests are global so login/signup can happen BEFORE a tenant exists.
+model OtpRequest {
+  id          String   @id @default(cuid())
+  mobile      String
+  // bcrypt hash of the OTP code — never store raw codes
+  codeHash    String   @map("code_hash")
+  purpose     OtpPurpose
+  attempts    Int      @default(0)
+  consumedAt  DateTime? @map("consumed_at")
+  expiresAt   DateTime  @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([mobile, purpose, createdAt])
+  @@map("otp_requests")
+  @@schema("platform")
+}
+
+enum OtpPurpose {
+  SIGNUP
+  LOGIN
+
+  @@schema("platform")
+}
+
+// Active device sessions. JWTs carry the session id (sid); auth middleware
+// rejects requests when the session is missing, expired, or revoked.
+// Enforces the "max 2 devices per mobile" rule via LRU eviction at login.
+model Session {
+  id          String    @id @default(cuid())
+  userId      String    @map("user_id")
+  tenantId    String    @map("tenant_id")
+  // Human label derived from User-Agent so the user can recognize devices later.
+  deviceLabel String?   @map("device_label")
+  userAgent   String?   @map("user_agent")
+  ip          String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  lastSeenAt  DateTime  @default(now()) @map("last_seen_at")
+  expiresAt   DateTime  @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+
+  user   PlatformUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt, expiresAt])
+  @@map("sessions")
+  @@schema("platform")
+}
