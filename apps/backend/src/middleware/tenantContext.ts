@@ -5,7 +5,7 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import type { PrismaClient } from '../../node_modules/.prisma/tenant-client';
-import { getTenantDb } from '../db/tenantClient';
+import { getTenantDb, assertTenantSchema } from '../db/tenantClient';
 import { platformDb } from '../db/platformClient';
 import { forbidden, unauthorized } from '../utils/errors';
 
@@ -41,7 +41,11 @@ export async function tenantContext(
 
     req.tenantId = tenant.id;
     req.tenantSchema = tenant.schemaName;
-    req.tenantDb = getTenantDb(tenant.schemaName);
+    const db = getTenantDb(tenant.schemaName);
+    // Belt-and-suspenders: confirm the cached client really points at this
+    // tenant's schema. Cheap after the first call per (process, schema).
+    await assertTenantSchema(db, tenant.schemaName);
+    req.tenantDb = db;
     next();
   } catch (err) {
     next(err);
