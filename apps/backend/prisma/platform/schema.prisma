@@ -157,3 +157,30 @@ model StaffInvite {
   @@map("staff_invites")
   @@schema("platform")
 }
+
+// Append-only audit trail of every mutation and authentication event. Used for
+// security review (who did what, when) and incident response. Never expose this
+// table to end users via a tenant-scoped route — it's an operator surface.
+//
+// `tenantId` / `userId` are nullable because a request can fail auth BEFORE we
+// know who the actor is (e.g. a signup attempt, or an unauthenticated POST).
+model AuditLog {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now()) @map("created_at")
+  tenantId   String?  @map("tenant_id")
+  userId     String?  @map("user_id")
+  role       Role?
+  method     String   // HTTP verb: POST / PUT / PATCH / DELETE
+  path       String   // request path (query string stripped)
+  status     Int      // HTTP status code returned
+  durationMs Int      @map("duration_ms")
+  ip         String?
+  userAgent  String?  @map("user_agent")
+  errorCode  String?  @map("error_code") // app error code on non-2xx (e.g. FORBIDDEN)
+
+  @@index([createdAt])
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+  @@schema("platform")
+}
