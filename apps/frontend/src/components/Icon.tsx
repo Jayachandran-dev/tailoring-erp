@@ -26,7 +26,8 @@ export type IconName =
   | 'trash'
   | 'menu'
   | 'chevron-down'
-  | 'chevron-right';
+  | 'chevron-right'
+  | 'log-out';
 
 interface Props extends Omit<SVGProps<SVGSVGElement>, 'name'> {
   name:   IconName;
@@ -147,6 +148,13 @@ const PATHS: Record<IconName, JSX.Element> = {
   ),
   'chevron-down': <path d="M6 9l6 6 6-6" />,
   'chevron-right': <path d="M9 6l6 6-6 6" />,
+  'log-out': (
+    <>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="M16 17l5-5-5-5" />
+      <path d="M21 12H9" />
+    </>
+  ),
 };
 
 export function Icon({ name, size = 18, title, ...rest }: Props) {

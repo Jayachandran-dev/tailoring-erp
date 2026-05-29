@@ -189,6 +189,32 @@ code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-size: 13p
 .is-collapsed .nav-link { grid-template-columns: 22px; justify-content: center; padding: 10px 0; }
 .is-collapsed .sidebar-user { justify-content: center; padding: 0; }
 
+/* Logo wrapper is a button so users can click it to toggle the sidebar
+   (critical for re-expanding when collapsed, since the chevron is hidden). */
+.sidebar-brand-logo {
+  width: 32px; height: 32px;
+  padding: 0; margin: 0;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.sidebar-brand-logo:hover {
+  background: rgba(226, 232, 240, 0.08);
+  box-shadow: 0 0 0 2px rgba(226, 232, 240, 0.18);
+}
+.sidebar-brand-logo:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.7);
+  outline-offset: 2px;
+}
+.sidebar-brand-logo .sidebar-logo {
+  width: 100%; height: 100%;
+  margin: 0;
+}
+
 .sidebar-foot { border-top: 1px solid var(--nav-border); padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
 .sidebar-user { display: flex; align-items: center; gap: 10px; padding: 4px 6px; }
 .sidebar-user-avatar {
@@ -202,7 +228,26 @@ code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-size: 13p
   color: #e2e8f0; font-size: 13px; font-weight: 600;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.sidebar-signout { width: 100%; }
+.sidebar-signout,
+button.sidebar-signout {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #e2e8f0;
+  background: transparent;
+  border: 1px solid rgba(226, 232, 240, 0.18);
+  padding: 8px 12px;
+  font-weight: 500;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.sidebar-signout:hover,
+button.sidebar-signout:hover {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.45);
+  color: #fecaca;
+}
 
 .drawer-backdrop { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.5); z-index: 40; }
 
@@ -1329,8 +1374,31 @@ button.warn:hover { background: #d97706; }
 label.check {
   display: inline-flex; align-items: center; gap: 8px;
   font-weight: 400; cursor: pointer; user-select: none;
+  white-space: nowrap;
 }
-label.check input { margin: 0; }
+label.check input,
+label.check input[type="checkbox"] {
+  width: 16px; height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: #4f46e5;
+}
+
+/* Hint text shown directly below a form field (e.g., the UPI format hint). */
+.form .field-hint {
+  margin: 4px 0 12px;
+  font-size: 12px;
+  color: var(--muted, #64748b);
+  line-height: 1.4;
+}
+
+/* Row of checkbox labels (e.g., Use as default + Active). */
+.form .check-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 10px 0 6px;
+}
 
 .upi-grid {
   display: grid;
@@ -1339,14 +1407,39 @@ label.check input { margin: 0; }
 }
 .upi-card { display: flex; flex-direction: column; gap: 12px; }
 .upi-card.inactive { opacity: 0.6; }
-.upi-card-head { display: flex; gap: 12px; align-items: flex-start; }
-.upi-card-head .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.upi-card-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+.upi-card-thumb {
+  width: 56px; height: 56px;
+  border-radius: 12px;
+  background: #f1f5f9;
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.upi-card-thumb svg,
+.upi-card-thumb canvas,
+.upi-card-thumb img { width: 100%; height: 100%; display: block; }
+.upi-card-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.upi-card-name {
+  font-size: 15px; font-weight: 600; color: #0f172a;
+  line-height: 1.2;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.upi-card-actions {
+  display: flex; align-items: center; gap: 6px;
+  flex-shrink: 0;
+}
 .upi-handle {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px; color: var(--text, #0f172a); margin-top: 2px;
+  font-size: 12px; color: var(--muted, #64748b);
   word-break: break-all;
 }
-.upi-card-qr { flex-shrink: 0; }
 .upi-stats {
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
   border-top: 1px solid var(--border); padding-top: 10px;
@@ -1356,7 +1449,18 @@ label.check input { margin: 0; }
 .upi-card-foot { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 .upi-card-foot button { width: auto; flex: 1; margin: 0; min-width: 0; }
 
-.default-pill { background: #dcfce7; color: #166534; }
+.default-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #fb923c, #f97316);
+  color: #fff;
+  border: none;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  box-shadow: 0 2px 6px -2px rgba(249, 115, 22, 0.55);
+}
+.default-pill svg { stroke: currentColor; fill: #fff; }
 
 .upi-qr {
   display: inline-block;
@@ -1707,48 +1811,32 @@ button:has(> svg) {
 }
 .upi-set-default:hover { background: #eef2ff; text-decoration: none; }
 
-/* Gold-gradient "Set as default" pill, lives right under the UPI handle so
-   it doesn't grow the card height. */
+/* Compact "Set as default" pill shown in the top-right of a UPI card.
+   Soft amber tint so it reads as a related-but-secondary action to DEFAULT. */
 .btn-set-default {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: 8px;
-  padding: 4px 10px;
+  margin: 0;
+  padding: 4px 12px;
+  width: auto;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: #6b3f00;
-  background:
-    linear-gradient(#fffaf0, #fffaf0) padding-box,
-    linear-gradient(135deg, #fde68a 0%, #f59e0b 45%, #b45309 100%) border-box;
-  border: 1.5px solid transparent;
+  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
   cursor: pointer;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    0 1px 2px rgba(180, 83, 9, 0.18),
-    0 4px 12px -6px rgba(245, 158, 11, 0.45);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease;
+  transition: color 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 .btn-set-default:hover {
-  background:
-    linear-gradient(135deg, #fef3c7, #fde68a) padding-box,
-    linear-gradient(135deg, #f59e0b, #b45309) border-box;
-  transform: translateY(-1px);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.7),
-    0 2px 4px rgba(180, 83, 9, 0.22),
-    0 10px 20px -10px rgba(245, 158, 11, 0.55);
+  color: #fff;
+  border-color: #f59e0b;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  box-shadow: 0 2px 6px -2px rgba(245, 158, 11, 0.55);
 }
-.btn-set-default:active { transform: translateY(0); }
 .btn-set-default:focus-visible {
   outline: 2px solid #f59e0b;
   outline-offset: 2px;
-}
-.btn-set-default svg {
-  fill: #f59e0b;
-  stroke: #b45309;
-  stroke-width: 1.5;
-  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.5));
 }

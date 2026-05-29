@@ -108,29 +108,32 @@ export function PaymentSettingsPage() {
           {rows.map(({ account, lifetime, last30d }) => (
             <article key={account.id} className={`card upi-card ${account.isActive ? '' : 'inactive'}`}>
               <header className="upi-card-head">
-                <div className="upi-card-qr">
-                  <UpiQrPreview upiId={account.upiId} payeeName={account.payeeName ?? account.label} size={96} />
+                <div className="upi-card-thumb">
+                  <UpiQrPreview upiId={account.upiId} payeeName={account.payeeName ?? account.label} size={56} />
                 </div>
-                <div className="grow">
-                  <div className="row">
-                    <strong>{account.label}</strong>
-                    {account.isDefault && <span className="pill default-pill">DEFAULT</span>}
-                    {!account.isActive && <span className="pill">INACTIVE</span>}
-                  </div>
+                <div className="upi-card-info">
+                  <strong className="upi-card-name">{account.label}</strong>
                   <div className="upi-handle">{account.upiId}</div>
                   {account.payeeName && (
                     <div className="muted small">Payee: {account.payeeName}</div>
                   )}
-                  {!account.isDefault && (
+                </div>
+                <div className="upi-card-actions">
+                  {account.isDefault ? (
+                    <span className="pill default-pill">
+                      <Icon name="star" size={12} />
+                      DEFAULT
+                    </span>
+                  ) : (
                     <button
                       type="button"
                       className="btn-set-default"
                       onClick={() => setAsDefault(account.id)}
                     >
-                      <Icon name="star" size={14} />
-                      <span>Set as default</span>
+                      Set as default
                     </button>
                   )}
+                  {!account.isActive && <span className="pill">INACTIVE</span>}
                 </div>
               </header>
 
@@ -263,7 +266,7 @@ function UpiAccountForm({
         autoCapitalize="off"
         autoCorrect="off"
       />
-      <p className="muted small" style={{ margin: '-4px 0 8px' }}>{VPA_HINT}</p>
+      <p className="field-hint">{VPA_HINT}</p>
 
       <label>Payee name (optional)</label>
       <input
@@ -275,7 +278,7 @@ function UpiAccountForm({
       <label>Notes (optional)</label>
       <input value={notes} onChange={(e) => setNotes(e.target.value)} />
 
-      <div className="row" style={{ gap: 16, margin: '6px 0' }}>
+      <div className="row check-row">
         <label className="check">
           <input
             type="checkbox"

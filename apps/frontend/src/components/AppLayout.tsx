@@ -227,13 +227,21 @@ export function AppLayout() {
 
       <aside className="sidebar" aria-label="Primary navigation">
         <div className="sidebar-brand">
-          {biz?.logoUrl ? (
-            <img className="sidebar-logo" src={assetUrl(biz.logoUrl)} alt="" />
-          ) : (
-            <span className="sidebar-logo placeholder">
-              {shopName.charAt(0).toUpperCase()}
-            </span>
-          )}
+          <button
+            type="button"
+            className="sidebar-brand-logo"
+            onClick={() => setCollapsed((v) => !v)}
+            aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+            title={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+          >
+            {biz?.logoUrl ? (
+              <img className="sidebar-logo" src={assetUrl(biz.logoUrl)} alt="" />
+            ) : (
+              <span className="sidebar-logo placeholder">
+                {shopName.charAt(0).toUpperCase()}
+              </span>
+            )}
+          </button>
           <div className="sidebar-brand-text">
             <div className="sidebar-shop" title={shopName}>{shopName}</div>
             <div className="muted small" title={subtitle}>{subtitle}</div>
@@ -265,8 +273,9 @@ export function AppLayout() {
               <div className="muted small">{session.tenant.slug}</div>
             </div>
           </div>
-          <button type="button" className="ghost sidebar-signout" onClick={() => void signOut()}>
-            Sign out
+          <button type="button" className="sidebar-signout" onClick={() => void signOut()}>
+            <Icon name="log-out" size={16} />
+            <span>Sign out</span>
           </button>
         </div>
       </aside>

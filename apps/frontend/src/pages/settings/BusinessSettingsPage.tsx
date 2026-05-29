@@ -180,8 +180,8 @@ export function BusinessSettingsPage() {
                 icon="image"
                 value={logoUrl}
                 disabled={logoBusy}
-                width={240}
-                height={160}
+                width={280}
+                height={170}
                 onSelect={(f) => { if (f) uploadLogo(f); else if (logoUrl) removeLogo(); }}
               />
               <ImageUpload
