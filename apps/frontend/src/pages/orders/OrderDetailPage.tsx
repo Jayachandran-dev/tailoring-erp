@@ -19,6 +19,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { StatusBadge, PriorityBadge } from '../../components/StatusBadge';
 import { UpiQrPreview } from '../../components/payments/UpiQrPreview';
 import { Icon } from '../../components/Icon';
+import { ShareOrderMenu } from '../../components/orders/ShareOrderMenu';
 import { rupees, rupeesToCents, shortDate, shortDateTime, signedRupees } from '../../utils/format';
 
 const NEXT_STATUS: Record<OrderStatus, OrderStatus[]> = {
@@ -118,6 +119,26 @@ export function OrderDetailPage() {
     }
   }
 
+  // Download / open the invoice PDF in a new tab. We fetch the bytes ourselves
+  // (instead of navigating to the URL) so the X-Tenant-Id header is sent —
+  // tenantContext middleware requires it for every authed request.
+  async function openInvoice() {
+    if (!ctx || !order) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const blob = await ordersApi.invoicePdf(ctx, order.id);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      // Revoke after a beat so the new tab has time to read it.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Failed to generate invoice');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading) return <p className="muted">Loading…</p>;
   if (error && !order) return <div className="error">{error}</div>;
   if (!order) return null;
@@ -146,6 +167,10 @@ export function OrderDetailPage() {
         subtitle={`Created ${shortDateTime(order.createdAt)}`}
         actions={
           <>
+            <button type="button" className="ghost" onClick={openInvoice} disabled={busy}>
+              <Icon name="file-text" size={16} />
+              <span>Invoice (PDF)</span>
+            </button>
             <button type="button" className="ghost" onClick={() => window.print()}>
               <Icon name="printer" size={16} />
               <span>Print</span>
@@ -209,6 +234,21 @@ export function OrderDetailPage() {
       {overpaid > 0 && (
         <div className="banner warn" data-print-hide>
           <strong>Overpaid by {rupees(overpaid)}.</strong> Use “Record refund” to return the extra to the customer.
+        </div>
+      )}
+
+      {/* Customer-facing share link (WhatsApp / copy / preview / revoke) */}
+      {ctx && order.customer && (
+        <div data-print-hide>
+          <ShareOrderMenu
+            ctx={ctx}
+            orderId={order.id}
+            orderNumber={order.orderNumber}
+            customerName={order.customer.name}
+            customerMobile={order.customer.mobile}
+            status={order.status}
+            businessName={session?.tenant.name ?? 'your tailor'}
+          />
         </div>
       )}
 

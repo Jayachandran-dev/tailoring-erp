@@ -67,6 +67,7 @@ const NAV: NavEntry[] = [
     children: [
       { kind: 'link', to: '/settings/business', label: 'Business', icon: 'building' },
       { kind: 'link', to: '/settings/payments', label: 'Payments', icon: 'credit-card' },
+      { kind: 'link', to: '/settings/team', label: 'Team', icon: 'users' },
     ],
   },
 ];

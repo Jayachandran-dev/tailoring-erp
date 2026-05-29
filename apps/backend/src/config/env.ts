@@ -6,6 +6,10 @@ const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
 
+  // Where the user-visible SPA is reachable. Used to build public links
+  // (customer order share, invoice URL). Defaults to CORS_ORIGIN for dev.
+  PUBLIC_APP_URL: z.string().optional(),
+
   DATABASE_URL: z.string().url(),
   DATABASE_BASE_URL: z.string().url(),
 

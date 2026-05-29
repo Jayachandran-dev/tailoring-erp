@@ -106,3 +106,31 @@ export function assetUrl(publicPath: string | null | undefined): string | undefi
   // /uploads/... is proxied to :4000 by vite dev server.
   return publicPath;
 }
+
+// Binary GET (PDF, etc.). Sends the same auth cookie + X-Tenant-Id header as
+// api(), but resolves to a Blob instead of JSON.
+export async function apiBlob(
+  path: string,
+  opts: Omit<RequestOpts, 'body'> = {},
+): Promise<Blob> {
+  const headers: Record<string, string> = {};
+  if (opts.tenantId) headers['X-Tenant-Id'] = opts.tenantId;
+  const res = await fetch(buildUrl(path, opts.query), {
+    method: opts.method ?? 'GET',
+    headers,
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let err: { code: string; message: string } = { code: 'UNKNOWN', message: res.statusText };
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed?.error) err = parsed.error;
+    } catch {
+      /* not JSON */
+    }
+    handle401(path, res.status);
+    throw new ApiError(res.status, err.code, err.message);
+  }
+  return await res.blob();
+}

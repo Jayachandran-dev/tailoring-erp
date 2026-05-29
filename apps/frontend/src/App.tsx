@@ -15,6 +15,7 @@ import { BusinessSettingsPage } from './pages/settings/BusinessSettingsPage';
 import { TeamSettingsPage } from './pages/settings/TeamSettingsPage';
 import { SettingsLayout } from './pages/settings/SettingsLayout';
 import { InvitePage } from './pages/InvitePage';
+import { PublicOrderPage } from './pages/PublicOrderPage';
 
 export default function App() {
   const { session, ready } = useAuth();
@@ -33,6 +34,8 @@ export default function App() {
     return (
       <div className="app-shell">
         <Routes>
+          {/* Customer-facing public order link — token-gated, no auth. */}
+          <Route path="/p/order/:token" element={<PublicOrderPage />} />
           {/* Invite acceptance must be reachable while signed-out. */}
           <Route path="/invite/:token" element={<InvitePage />} />
           <Route path="/auth" element={<AuthPage />} />
@@ -44,6 +47,8 @@ export default function App() {
 
   return (
     <Routes>
+      {/* Public order page works for signed-in users too (e.g. previewing). */}
+      <Route path="/p/order/:token" element={<PublicOrderPage />} />
       <Route element={<AppLayout />}>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/customers" element={<CustomersListPage />} />

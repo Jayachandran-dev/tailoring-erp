@@ -1840,3 +1840,96 @@ button:has(> svg) {
   outline: 2px solid #f59e0b;
   outline-offset: 2px;
 }
+
+/* =========================================================
+   Customer-facing public order status page (PublicOrderPage)
+   No nav drawer — standalone branded view shared via WhatsApp.
+   ========================================================= */
+.public-shell {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  display: grid;
+  gap: 16px;
+}
+.public-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.public-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+.public-business-name {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+.public-card {
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+}
+.public-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+.public-status {
+  padding: 16px;
+  border-radius: 12px;
+  text-align: center;
+}
+.public-status-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+.public-status-value {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-top: 4px;
+}
+.public-status--progress  { background: #fff7e0; color: #8a6300; }
+.public-status--ready     { background: #e3f5e1; color: #1f6e2c; }
+.public-status--done      { background: #e0f0ff; color: #115a9c; }
+.public-status--cancelled { background: #fde4e4; color: #8a1818; }
+.public-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.public-items li {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 10px 12px;
+  background: var(--bg-subtle, #f6f7f9);
+  border-radius: 8px;
+  gap: 12px;
+}
+.public-totals {
+  display: grid;
+  gap: 4px;
+  border-top: 1px solid var(--border, #e5e7eb);
+  padding-top: 12px;
+}
+.public-totals .row {
+  display: flex;
+  justify-content: space-between;
+}
+.public-totals .row--bold {
+  font-size: 1.05rem;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border, #e5e7eb);
+}
+.public-footer {
+  text-align: center;
+  padding: 8px 16px;
+}
