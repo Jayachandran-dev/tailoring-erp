@@ -6,12 +6,15 @@ import { z } from 'zod';
 import { Prisma } from '../../../node_modules/.prisma/tenant-client';
 import { requireAuth } from '../../middleware/auth';
 import { tenantContext } from '../../middleware/tenantContext';
+import { ownerOrManager } from '../../middleware/role';
 import { badRequest, notFound } from '../../utils/errors';
 import { imageUpload, saveBufferToTenant, deletePublicPath } from '../../utils/uploads';
 import measurementsRouter from '../measurements/measurements.controller';
 
 const router = Router();
 router.use(requireAuth, tenantContext);
+// Destructive operations (delete customer or customer image) are OWNER/MANAGER only.
+router.use((req, res, next) => (req.method === 'DELETE' ? ownerOrManager(req, res, next) : next()));
 
 const CustomerBaseSchema = {
   name: z.string().trim().min(1).max(120),

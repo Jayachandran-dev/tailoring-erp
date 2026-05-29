@@ -6,11 +6,14 @@ import { z } from 'zod';
 import { Prisma } from '../../../node_modules/.prisma/tenant-client';
 import { requireAuth } from '../../middleware/auth';
 import { tenantContext } from '../../middleware/tenantContext';
+import { ownerOrManager } from '../../middleware/role';
 import { badRequest, notFound } from '../../utils/errors';
 import { deletePublicPath, imageUpload, saveBufferToTenant } from '../../utils/uploads';
 
 const router = Router();
 router.use(requireAuth, tenantContext);
+// Catalog edits are OWNER/MANAGER only; STAFF can still browse the catalog.
+router.use((req, res, next) => (req.method === 'GET' ? next() : ownerOrManager(req, res, next)));
 
 const BaseSchema = {
   categoryId: z.string().min(1),

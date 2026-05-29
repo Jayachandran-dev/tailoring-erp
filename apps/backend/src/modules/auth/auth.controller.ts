@@ -11,17 +11,20 @@ import {
   logout,
 } from './auth.service';
 import { requireAuth } from '../../middleware/auth';
+import { authLimiter } from '../../middleware/rateLimiters';
 
 const router = Router();
 
-router.post('/signup/start', wrap(async (req) => startSignup(StartSignupSchema.parse(req.body))));
+router.post('/signup/start', authLimiter, wrap(async (req) => startSignup(StartSignupSchema.parse(req.body))));
 router.post(
   '/signup/verify',
+  authLimiter,
   wrap(async (req) => verifySignup(VerifySignupSchema.parse(req.body), contextFrom(req))),
 );
-router.post('/login/start', wrap(async (req) => startLogin(StartLoginSchema.parse(req.body))));
+router.post('/login/start', authLimiter, wrap(async (req) => startLogin(StartLoginSchema.parse(req.body))));
 router.post(
   '/login/verify',
+  authLimiter,
   wrap(async (req) => verifyLogin(VerifyLoginSchema.parse(req.body), contextFrom(req))),
 );
 

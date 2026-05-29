@@ -5,10 +5,13 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../middleware/auth';
 import { tenantContext } from '../../middleware/tenantContext';
+import { ownerOrManager } from '../../middleware/role';
 import { notFound } from '../../utils/errors';
 
 const router = Router();
 router.use(requireAuth, tenantContext);
+// Category edits are OWNER/MANAGER only; STAFF can still browse.
+router.use((req, res, next) => (req.method === 'GET' ? next() : ownerOrManager(req, res, next)));
 
 const CreateSchema = z.object({
   name: z.string().trim().min(1).max(60),

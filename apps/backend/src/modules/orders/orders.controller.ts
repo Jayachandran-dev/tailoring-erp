@@ -19,10 +19,13 @@ import {
 } from '../../../node_modules/.prisma/tenant-client';
 import { requireAuth } from '../../middleware/auth';
 import { tenantContext } from '../../middleware/tenantContext';
+import { ownerOrManager } from '../../middleware/role';
 import { badRequest, notFound } from '../../utils/errors';
 
 const router = Router();
 router.use(requireAuth, tenantContext);
+// Destructive operations (delete order or payment) are OWNER/MANAGER only.
+router.use((req, res, next) => (req.method === 'DELETE' ? ownerOrManager(req, res, next) : next()));
 
 // --- helpers ---------------------------------------------------------------
 

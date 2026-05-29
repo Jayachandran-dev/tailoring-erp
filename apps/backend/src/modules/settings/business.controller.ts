@@ -9,11 +9,14 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../middleware/auth';
 import { tenantContext } from '../../middleware/tenantContext';
+import { ownerOrManager } from '../../middleware/role';
 import { badRequest } from '../../utils/errors';
 import { deletePublicPath, imageUpload, saveBufferToTenant } from '../../utils/uploads';
 
 const router = Router();
 router.use(requireAuth, tenantContext);
+// Reads are open to any authenticated user; mutations require OWNER or MANAGER.
+router.use((req, res, next) => (req.method === 'GET' ? next() : ownerOrManager(req, res, next)));
 
 const SINGLETON_ID = 'default';
 

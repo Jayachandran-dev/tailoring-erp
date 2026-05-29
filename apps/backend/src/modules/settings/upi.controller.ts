@@ -9,10 +9,13 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../middleware/auth';
 import { tenantContext } from '../../middleware/tenantContext';
+import { ownerOrManager } from '../../middleware/role';
 import { badRequest, notFound } from '../../utils/errors';
 
 const router = Router();
 router.use(requireAuth, tenantContext);
+// Reads are open to any authenticated user; mutations require OWNER or MANAGER.
+router.use((req, res, next) => (req.method === 'GET' ? next() : ownerOrManager(req, res, next)));
 
 // UPI VPA shape: <handle>@<provider>. Keep validation forgiving but sane.
 const VPA_RE = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z][a-zA-Z0-9.-]{1,64}$/;
