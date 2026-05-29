@@ -349,6 +349,10 @@ export const ordersApi = {
   // Invoice PDF (returns a Blob the caller can open in a new tab or download).
   invoicePdf: (ctx: Ctx, id: string) =>
     apiBlob(`/orders/${id}/invoice.pdf`, ctx),
+
+  // Tailor-facing work-order PDF (no prices, includes measurements).
+  workOrderPdf: (ctx: Ctx, id: string) =>
+    apiBlob(`/orders/${id}/work-order.pdf`, ctx),
 };
 
 export interface ShareLink {

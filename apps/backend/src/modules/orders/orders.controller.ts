@@ -24,6 +24,7 @@ import { badRequest, notFound } from '../../utils/errors';
 import { env } from '../../config/env';
 import * as shareService from '../sharing/share.service';
 import { renderInvoicePdf } from '../sharing/invoice.service';
+import { renderWorkOrderPdf } from '../sharing/workOrder.service';
 
 const router = Router();
 router.use(requireAuth, tenantContext);
@@ -598,6 +599,63 @@ router.get('/:id/invoice.pdf', async (req, res, next) => {
         invoicePrefix: business.invoicePrefix,
         invoiceFooter: business.invoiceFooter,
         terms: business.terms,
+      },
+      res,
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Stream a tailor-facing work-order PDF (no prices, includes measurements).
+router.get('/:id/work-order.pdf', async (req, res, next) => {
+  try {
+    const orderId = String(req.params.id);
+    const order = await req.tenantDb!.order.findUnique({
+      where: { id: orderId },
+      include: {
+        customer: { select: { name: true, mobile: true, address: true } },
+        items: { orderBy: { sortOrder: 'asc' } },
+      },
+    });
+    if (!order) throw notFound('Order not found');
+    const business = await req.tenantDb!.businessSettings.findFirst();
+    if (!business) throw badRequest('Configure Business Settings before printing a work order');
+
+    const filename = `work-order-${(order.orderNumber || order.id).replace(/[^a-z0-9-]/gi, '_')}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+
+    renderWorkOrderPdf(
+      {
+        orderNumber: order.orderNumber,
+        createdAt: order.createdAt,
+        status: order.status,
+        notes: order.notes,
+        priority: order.priority,
+        dueDate: order.dueDate,
+        customer: {
+          name: order.customer.name,
+          mobile: order.customer.mobile,
+          address: order.customer.address,
+        },
+        items: order.items.map((it) => ({
+          name: it.name,
+          garmentType: it.garmentType,
+          qty: it.qty,
+          notes: it.notes,
+          measurementSnapshot:
+            (it.measurementSnapshot as Record<string, string | number> | null) ?? null,
+        })),
+      },
+      {
+        businessName: business.businessName,
+        phone: business.phone,
+        addressLine1: business.addressLine1,
+        city: business.city,
+        state: business.state,
+        pincode: business.pincode,
+        logoUrl: business.logoUrl,
       },
       res,
     );

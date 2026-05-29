@@ -61,6 +61,7 @@ export function OrderDetailPage() {
   const [pdfOpen, setPdfOpen] = useState(false);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [pdfShareUrl, setPdfShareUrl] = useState<string | null>(null);
+  const [pdfKind, setPdfKind] = useState<'invoice' | 'work-order'>('invoice');
 
   const load = useCallback(async () => {
     if (!ctx) return;
@@ -135,6 +136,7 @@ export function OrderDetailPage() {
     setError(null);
     setPdfBlob(null);
     setPdfShareUrl(null);
+    setPdfKind('invoice');
     setPdfOpen(true);
     try {
       const [blob, link] = await Promise.all([
@@ -145,6 +147,26 @@ export function OrderDetailPage() {
       setPdfShareUrl(link?.url ?? null);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Failed to generate invoice');
+      setPdfOpen(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Tailor-facing work order: no prices, includes measurements.
+  async function openWorkOrder() {
+    if (!ctx || !order) return;
+    setBusy(true);
+    setError(null);
+    setPdfBlob(null);
+    setPdfShareUrl(null); // tailor copy never gets the customer share link
+    setPdfKind('work-order');
+    setPdfOpen(true);
+    try {
+      const blob = await ordersApi.workOrderPdf(ctx, order.id);
+      setPdfBlob(blob);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Failed to generate work order');
       setPdfOpen(false);
     } finally {
       setBusy(false);
@@ -188,6 +210,10 @@ export function OrderDetailPage() {
             <button type="button" className="ghost" onClick={openInvoice} disabled={busy}>
               <Icon name="file-text" size={16} />
               <span>Invoice (PDF)</span>
+            </button>
+            <button type="button" className="ghost" onClick={openWorkOrder} disabled={busy}>
+              <Icon name="file-text" size={16} />
+              <span>Work order</span>
             </button>
             <button type="button" className="ghost" onClick={() => window.print()}>
               <Icon name="printer" size={16} />
@@ -486,10 +512,14 @@ export function OrderDetailPage() {
       <PdfViewerModal
         open={pdfOpen}
         onClose={closeInvoice}
-        title={`Invoice — ${order.orderNumber ?? ''}`}
+        title={
+          pdfKind === 'invoice'
+            ? `Invoice — ${order.orderNumber ?? ''}`
+            : `Work order — ${order.orderNumber ?? ''}`
+        }
         blob={pdfBlob}
-        filename={`invoice-${(order.orderNumber ?? 'order').replace(/[^\w.-]+/g, '_')}.pdf`}
-        shareUrl={pdfShareUrl}
+        filename={`${pdfKind === 'invoice' ? 'invoice' : 'work-order'}-${(order.orderNumber ?? 'order').replace(/[^\w.-]+/g, '_')}.pdf`}
+        shareUrl={pdfKind === 'invoice' ? pdfShareUrl : null}
         shareToPhone={order.customer?.mobile ?? null}
         shareMessage={`Hi ${order.customer?.name ?? ''}, here is your invoice for order ${order.orderNumber ?? ''}.`}
       />

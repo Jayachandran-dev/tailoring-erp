@@ -4,12 +4,14 @@
 //  3) Pricing (discount, due date, priority, advance payment, notes)
 // Server computes the order number and authoritative totals.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import {
+  measurementsApi,
   ordersApi,
   type Customer,
+  type Measurement,
   type OrderCreateInput,
   type OrderItemInput,
   type OrderPriority,
@@ -31,6 +33,7 @@ export function OrderCreatePage() {
   const nav = useNavigate();
 
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const [customerMeasurements, setCustomerMeasurements] = useState<Measurement[]>([]);
   const [items, setItems] = useState<OrderItemInput[]>([]);
   const [discountRupees, setDiscountRupees] = useState('');
   const [priority, setPriority] = useState<OrderPriority>('NORMAL');
@@ -51,6 +54,27 @@ export function OrderCreatePage() {
   const total = Math.max(0, subtotal - discountCents);
   const advanceCents = rupeesToCents(advanceRupees);
   const balance = Math.max(0, total - advanceCents);
+
+  // Load the picked customer's measurements once so the item editor can
+  // suggest "use saved measurement" without each row fetching independently.
+  useEffect(() => {
+    if (!session || !customer) {
+      setCustomerMeasurements([]);
+      return;
+    }
+    let cancelled = false;
+    measurementsApi
+      .list({ token: session.token, tenantId: session.tenant.id }, customer.id)
+      .then((list) => {
+        if (!cancelled) setCustomerMeasurements(list);
+      })
+      .catch(() => {
+        if (!cancelled) setCustomerMeasurements([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session, customer]);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -122,6 +146,7 @@ export function OrderCreatePage() {
             items={items}
             onChange={setItems}
             onAddDesign={() => setPickerOpen(true)}
+            measurements={customerMeasurements}
           />
         </section>
 

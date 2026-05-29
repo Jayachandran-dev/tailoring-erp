@@ -1973,3 +1973,15 @@ button:has(> svg) {
   align-items: center;
   gap: 6px;
 }
+
+/* Order item: measurement picker row */
+.item-measurement-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.item-measurement-row select {
+  min-width: 220px;
+}
