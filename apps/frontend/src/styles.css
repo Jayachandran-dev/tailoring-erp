@@ -1933,3 +1933,28 @@ button:has(> svg) {
   text-align: center;
   padding: 8px 16px;
 }
+
+/* =========================================================
+   PDF preview dialog (PdfViewerModal)
+   ========================================================= */
+.pdf-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* Modal body provides its own padding; fill nearly full viewport height. */
+  height: min(78vh, 720px);
+}
+.pdf-viewer__frame {
+  flex: 1;
+  width: 100%;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  background: #525659; /* matches Chromium PDF viewer chrome */
+  min-height: 320px;
+}
+.pdf-viewer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}

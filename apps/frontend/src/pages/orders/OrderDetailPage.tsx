@@ -20,6 +20,7 @@ import { StatusBadge, PriorityBadge } from '../../components/StatusBadge';
 import { UpiQrPreview } from '../../components/payments/UpiQrPreview';
 import { Icon } from '../../components/Icon';
 import { ShareOrderMenu } from '../../components/orders/ShareOrderMenu';
+import { PdfViewerModal } from '../../components/PdfViewerModal';
 import { rupees, rupeesToCents, shortDate, shortDateTime, signedRupees } from '../../utils/format';
 
 const NEXT_STATUS: Record<OrderStatus, OrderStatus[]> = {
@@ -56,6 +57,10 @@ export function OrderDetailPage() {
 
   const [payOpen, setPayOpen] = useState<'payment' | 'refund' | null>(null);
   const [delOpen, setDelOpen] = useState(false);
+  // Invoice PDF preview dialog state — fetched lazily on first open.
+  const [pdfOpen, setPdfOpen] = useState(false);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  const [pdfShareUrl, setPdfShareUrl] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!ctx) return;
@@ -119,24 +124,37 @@ export function OrderDetailPage() {
     }
   }
 
-  // Download / open the invoice PDF in a new tab. We fetch the bytes ourselves
-  // (instead of navigating to the URL) so the X-Tenant-Id header is sent —
-  // tenantContext middleware requires it for every authed request.
+  // Open the invoice in our in-app PDF dialog (preview + download + share).
+  // We fetch the PDF bytes ourselves so the X-Tenant-Id header is sent —
+  // tenantContext middleware requires it for every authed request — then mint
+  // an object URL inside the modal. The current active share link (if any)
+  // is loaded in parallel so the Share buttons inside the dialog work.
   async function openInvoice() {
     if (!ctx || !order) return;
     setBusy(true);
     setError(null);
+    setPdfBlob(null);
+    setPdfShareUrl(null);
+    setPdfOpen(true);
     try {
-      const blob = await ordersApi.invoicePdf(ctx, order.id);
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener,noreferrer');
-      // Revoke after a beat so the new tab has time to read it.
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      const [blob, link] = await Promise.all([
+        ordersApi.invoicePdf(ctx, order.id),
+        ordersApi.getShareLink(ctx, order.id).catch(() => null),
+      ]);
+      setPdfBlob(blob);
+      setPdfShareUrl(link?.url ?? null);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Failed to generate invoice');
+      setPdfOpen(false);
     } finally {
       setBusy(false);
     }
+  }
+
+  function closeInvoice() {
+    setPdfOpen(false);
+    // Drop the blob so memory can be reclaimed; URL is revoked inside the modal.
+    setPdfBlob(null);
   }
 
   if (loading) return <p className="muted">Loading…</p>;
@@ -463,6 +481,17 @@ export function OrderDetailPage() {
         variant="danger"
         onCancel={() => setDelOpen(false)}
         onConfirm={deleteOrder}
+      />
+
+      <PdfViewerModal
+        open={pdfOpen}
+        onClose={closeInvoice}
+        title={`Invoice — ${order.orderNumber ?? ''}`}
+        blob={pdfBlob}
+        filename={`invoice-${(order.orderNumber ?? 'order').replace(/[^\w.-]+/g, '_')}.pdf`}
+        shareUrl={pdfShareUrl}
+        shareToPhone={order.customer?.mobile ?? null}
+        shareMessage={`Hi ${order.customer?.name ?? ''}, here is your invoice for order ${order.orderNumber ?? ''}.`}
       />
     </>
   );

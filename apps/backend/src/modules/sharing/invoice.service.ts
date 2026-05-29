@@ -4,8 +4,11 @@
 // client without spawning Chromium. Layout is intentionally minimal — header
 // (business identity), customer block, items table, totals, footer (terms).
 //
-// Money is stored in cents; we format as ₹X,XXX.XX using the business's
-// configured currency.
+// Money is stored in cents; we format as Rs. X,XXX.XX for INR (using
+// `Rs.` rather than the ₹ glyph because pdfkit's built-in Helvetica has
+// no rupee codepoint and renders it as a `¹` fallback). If you bundle a
+// TTF that includes U+20B9 and register it via `doc.registerFont(...)`,
+// swap the prefix below back to `₹`.
 
 import PDFDocument from 'pdfkit';
 import path from 'path';
@@ -64,7 +67,7 @@ export interface InvoiceBusiness {
 function fmtMoney(cents: number, currency: string): string {
   const sign = cents < 0 ? '-' : '';
   const abs = Math.abs(cents) / 100;
-  const symbol = currency === 'INR' ? '₹' : currency + ' ';
+  const symbol = currency === 'INR' ? 'Rs. ' : currency + ' ';
   return `${sign}${symbol}${abs.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
