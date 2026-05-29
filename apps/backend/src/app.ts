@@ -16,6 +16,26 @@ export function createApp() {
 
   app.use(
     helmet({
+      // The API serves JSON and static image uploads — never HTML that would
+      // execute scripts in a browser. Locking everything down means that even
+      // if a response slips through as text/html, it can't bootstrap an XSS.
+      // `frame-ancestors 'none'` also blocks click-jacking of any errant HTML.
+      contentSecurityPolicy: {
+        useDefaults: false,
+        directives: {
+          defaultSrc: ["'none'"],
+          imgSrc: ["'self'", 'data:'],
+          baseUri: ["'none'"],
+          formAction: ["'none'"],
+          frameAncestors: ["'none'"],
+          objectSrc: ["'none'"],
+        },
+      },
+      // Block iframing the API entirely (defense-in-depth on top of CSP).
+      frameguard: { action: 'deny' },
+      // Don't leak referrers from API responses (most clients are non-browser
+      // anyway, but tighten where we can).
+      referrerPolicy: { policy: 'no-referrer' },
       // Allow cross-origin static assets (frontend on :5173 fetching images from :4000).
       crossOriginResourcePolicy: { policy: 'cross-origin' },
     }),
