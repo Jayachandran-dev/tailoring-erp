@@ -4,16 +4,34 @@
 // client without spawning Chromium. Layout is intentionally minimal — header
 // (business identity), customer block, items table, totals, footer (terms).
 //
-// Money is stored in cents; we format as Rs. X,XXX.XX for INR (using
-// `Rs.` rather than the ₹ glyph because pdfkit's built-in Helvetica has
-// no rupee codepoint and renders it as a `¹` fallback). If you bundle a
-// TTF that includes U+20B9 and register it via `doc.registerFont(...)`,
-// swap the prefix below back to `₹`.
+// Money is stored in cents; we format as ₹X,XXX.XX for INR when a custom
+// invoice font is configured (env INVOICE_FONT_PATH) — the standard PDF
+// Helvetica has no rupee codepoint (U+20B9) and renders it as a `¹`
+// fallback, so without a font we degrade to a plain `Rs. ` prefix.
 
 import PDFDocument from 'pdfkit';
 import path from 'path';
 import fs from 'fs';
 import { UPLOADS_ROOT } from '../../utils/uploads';
+import { env } from '../../config/env';
+
+// Font loading. Read once at module import — we cache the Buffer (or null) so
+// we don't hit the disk per invoice. If the path is invalid we log once and
+// fall back to standard Helvetica + 'Rs. ' for INR.
+const CUSTOM_FONT_NAME = 'InvoiceCustom';
+const customFontBuffer: Buffer | null = (() => {
+  const p = env.INVOICE_FONT_PATH;
+  if (!p) return null;
+  try {
+    const abs = path.isAbsolute(p) ? p : path.resolve(process.cwd(), p);
+    return fs.readFileSync(abs);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(`[invoice] INVOICE_FONT_PATH set but unreadable: ${(err as Error).message}`);
+    return null;
+  }
+})();
+const HAS_RUPEE_FONT = customFontBuffer !== null;
 
 // Minimum shape we need from the order — kept loose so this module doesn't
 // drag the full Prisma type into its signature (and so tests can hand-build).
@@ -67,7 +85,7 @@ export interface InvoiceBusiness {
 function fmtMoney(cents: number, currency: string): string {
   const sign = cents < 0 ? '-' : '';
   const abs = Math.abs(cents) / 100;
-  const symbol = currency === 'INR' ? 'Rs. ' : currency + ' ';
+  const symbol = currency === 'INR' ? (HAS_RUPEE_FONT ? '₹' : 'Rs. ') : currency + ' ';
   return `${sign}${symbol}${abs.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
@@ -113,6 +131,18 @@ export function renderInvoicePdf(
 ): void {
   const doc = new PDFDocument({ size: 'A4', margin: 40, info: { Title: invoiceTitle(order, business) } });
   doc.pipe(out);
+
+  // Register the custom font once per document, then make it the default so
+  // every subsequent doc.text() call can render ₹ and other extended glyphs.
+  if (customFontBuffer) {
+    try {
+      doc.registerFont(CUSTOM_FONT_NAME, customFontBuffer);
+      doc.font(CUSTOM_FONT_NAME);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(`[invoice] failed to register custom font: ${(err as Error).message}`);
+    }
+  }
 
   const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const left = doc.page.margins.left;

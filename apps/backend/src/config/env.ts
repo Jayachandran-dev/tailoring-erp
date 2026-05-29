@@ -10,6 +10,13 @@ const EnvSchema = z.object({
   // (customer order share, invoice URL). Defaults to CORS_ORIGIN for dev.
   PUBLIC_APP_URL: z.string().optional(),
 
+  // Optional path to a TrueType / OpenType font used for invoice PDFs.
+  // When set, the font is registered with pdfkit and we render the actual
+  // ₹ glyph (U+20B9). When unset, we fall back to Helvetica + "Rs. " prefix
+  // because the standard PDF fonts don't include the rupee glyph.
+  // Recommended: Noto Sans, Inter, Lato — anything with broad Unicode coverage.
+  INVOICE_FONT_PATH: z.string().optional(),
+
   DATABASE_URL: z.string().url(),
   DATABASE_BASE_URL: z.string().url(),
 
