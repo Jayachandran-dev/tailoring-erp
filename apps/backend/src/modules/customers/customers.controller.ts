@@ -117,7 +117,8 @@ router.delete('/:id', async (req, res, next) => {
 router.post('/:id/image', imageUpload.single('image'), async (req, res, next) => {
   try {
     if (!req.file) throw badRequest('image file is required (field name "image")');
-    const customer = await req.tenantDb!.customer.findUnique({ where: { id: req.params.id } });
+    const id = String(req.params.id);
+    const customer = await req.tenantDb!.customer.findUnique({ where: { id } });
     if (!customer) throw notFound('Customer not found');
 
     const saved = await saveBufferToTenant({

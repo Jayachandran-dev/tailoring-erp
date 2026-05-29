@@ -2,8 +2,8 @@ import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 interface Props {
-  title: string;
-  subtitle?: string;
+  title: ReactNode;
+  subtitle?: ReactNode;
   back?: string; // route to navigate back to
   actions?: ReactNode;
 }

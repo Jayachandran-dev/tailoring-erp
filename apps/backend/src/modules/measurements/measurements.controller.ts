@@ -10,6 +10,13 @@ import { notFound } from '../../utils/errors';
 const router = Router({ mergeParams: true });
 router.use(requireAuth, tenantContext);
 
+// Params from this router include the parent route's :customerId (because of
+// mergeParams above). The default Router type only sees the local route params,
+// so we read through this helper to keep TS happy without sprinkling `as` casts.
+function paramsOf(req: { params: Record<string, string | undefined> }) {
+  return req.params as { customerId?: string; id?: string };
+}
+
 // data is a free-form record of field -> string|number (cm/inches as configured by shop)
 const FieldValuesSchema = z.record(z.union([z.string(), z.number()]));
 
@@ -24,7 +31,7 @@ const UpdateSchema = CreateSchema.partial();
 // GET /customers/:customerId/measurements
 router.get('/', async (req, res, next) => {
   try {
-    const customerId = req.params.customerId;
+    const { customerId } = paramsOf(req);
     const items = await req.tenantDb!.measurement.findMany({
       where: { customerId },
       orderBy: { takenAt: 'desc' },
@@ -37,13 +44,13 @@ router.get('/', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const customerId = req.params.customerId;
+    const { customerId } = paramsOf(req);
     const customer = await req.tenantDb!.customer.findUnique({ where: { id: customerId } });
     if (!customer) throw notFound('Customer not found');
 
     const input = CreateSchema.parse(req.body);
     const created = await req.tenantDb!.measurement.create({
-      data: { ...input, customerId },
+      data: { ...input, customerId: customer.id },
     });
     res.status(201).json({ data: created });
   } catch (err) {
@@ -53,8 +60,7 @@ router.post('/', async (req, res, next) => {
 
 router.patch('/:id', async (req, res, next) => {
   try {
-    const id = req.params.id;
-    const customerId = req.params.customerId;
+    const { id, customerId } = paramsOf(req);
     const existing = await req.tenantDb!.measurement.findUnique({ where: { id } });
     if (!existing || existing.customerId !== customerId) throw notFound('Measurement not found');
     const input = UpdateSchema.parse(req.body);
@@ -67,8 +73,7 @@ router.patch('/:id', async (req, res, next) => {
 
 router.delete('/:id', async (req, res, next) => {
   try {
-    const id = req.params.id;
-    const customerId = req.params.customerId;
+    const { id, customerId } = paramsOf(req);
     const existing = await req.tenantDb!.measurement.findUnique({ where: { id } });
     if (!existing || existing.customerId !== customerId) throw notFound('Measurement not found');
     await req.tenantDb!.measurement.delete({ where: { id } });

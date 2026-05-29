@@ -37,7 +37,7 @@ export function DesignFormModalBody({
   );
   const [tags, setTags] = useState(design?.tags ?? '');
   const [notes, setNotes] = useState(design?.notes ?? '');
-  const [storedImage, setStoredImage] = useState<string | null>(design?.imageUrl ?? null);
+  const [storedImage] = useState<string | null>(design?.imageUrl ?? null);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [removeStoredImage, setRemoveStoredImage] = useState(false);
 
