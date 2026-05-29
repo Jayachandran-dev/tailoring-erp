@@ -12,7 +12,9 @@ import { OrderCreatePage } from './pages/orders/OrderCreatePage';
 import { OrderDetailPage } from './pages/orders/OrderDetailPage';
 import { PaymentSettingsPage } from './pages/settings/PaymentSettingsPage';
 import { BusinessSettingsPage } from './pages/settings/BusinessSettingsPage';
+import { TeamSettingsPage } from './pages/settings/TeamSettingsPage';
 import { SettingsLayout } from './pages/settings/SettingsLayout';
+import { InvitePage } from './pages/InvitePage';
 
 export default function App() {
   const { session, ready } = useAuth();
@@ -31,6 +33,8 @@ export default function App() {
     return (
       <div className="app-shell">
         <Routes>
+          {/* Invite acceptance must be reachable while signed-out. */}
+          <Route path="/invite/:token" element={<InvitePage />} />
           <Route path="/auth" element={<AuthPage />} />
           <Route path="*" element={<Navigate to="/auth" replace />} />
         </Routes>
@@ -54,8 +58,11 @@ export default function App() {
           <Route index element={<Navigate to="business" replace />} />
           <Route path="business" element={<BusinessSettingsPage />} />
           <Route path="payments" element={<PaymentSettingsPage />} />
+          <Route path="team" element={<TeamSettingsPage />} />
         </Route>
         <Route path="/auth" element={<Navigate to="/" replace />} />
+        {/* If a signed-in user clicks an invite link, send them back to the dashboard. */}
+        <Route path="/invite/:token" element={<Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

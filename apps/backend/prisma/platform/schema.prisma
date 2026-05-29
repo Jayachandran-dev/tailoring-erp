@@ -29,6 +29,7 @@ model Tenant {
 
   memberships  TenantMembership[]
   sessions     Session[]
+  invites      StaffInvite[]
 
   @@map("tenants")
   @@schema("platform")
@@ -53,6 +54,7 @@ model PlatformUser {
 
   memberships TenantMembership[]
   sessions    Session[]
+  invitesIssued StaffInvite[] @relation("InvitedBy")
 
   @@map("platform_users")
   @@schema("platform")
@@ -101,6 +103,7 @@ model OtpRequest {
 enum OtpPurpose {
   SIGNUP
   LOGIN
+  INVITE
 
   @@schema("platform")
 }
@@ -126,5 +129,31 @@ model Session {
 
   @@index([userId, revokedAt, expiresAt])
   @@map("sessions")
+  @@schema("platform")
+}
+
+// Pending invitation to join a tenant as MANAGER/STAFF. Created by an
+// OWNER/MANAGER; redeemed by the invitee via OTP. Tokens are opaque, single-use,
+// and time-bound. Revoked invites are kept for audit until purged.
+model StaffInvite {
+  id              String    @id @default(cuid())
+  tenantId        String    @map("tenant_id")
+  mobile          String
+  role            Role      @default(STAFF)
+  displayName     String?   @map("display_name")
+  // Opaque URL-safe token; the SPA passes it back when starting/verifying the invite.
+  token           String    @unique
+  invitedByUserId String    @map("invited_by_user_id")
+  expiresAt       DateTime  @map("expires_at")
+  consumedAt      DateTime? @map("consumed_at")
+  revokedAt       DateTime? @map("revoked_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  tenant     Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invitedBy  PlatformUser @relation("InvitedBy", fields: [invitedByUserId], references: [id])
+
+  @@index([tenantId, consumedAt, revokedAt, expiresAt])
+  @@index([mobile])
+  @@map("staff_invites")
   @@schema("platform")
 }

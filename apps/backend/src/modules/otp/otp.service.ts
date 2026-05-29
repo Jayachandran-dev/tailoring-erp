@@ -6,7 +6,7 @@ import { getSmsProvider } from './providers';
 import { badRequest, tooMany, unauthorized } from '../../utils/errors';
 import { logger } from '../../config/logger';
 
-export type OtpPurpose = 'SIGNUP' | 'LOGIN';
+export type OtpPurpose = 'SIGNUP' | 'LOGIN' | 'INVITE';
 
 const RESEND_COOLDOWN_SECONDS = 30;
 const MAX_REQUESTS_PER_HOUR = 5;
