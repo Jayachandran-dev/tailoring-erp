@@ -1,10 +1,11 @@
 // Thin fetch wrapper that:
 //  - prefixes the API base URL
-//  - injects the Authorization bearer token (from localStorage)
-//  - injects the X-Tenant-Id header (REQUIRED by the backend for tenant-scoped routes)
+//  - sends cookies on every request (the JWT lives in an httpOnly cookie set
+//    by the backend on login/signup — JS never sees it)
+//  - injects the X-Tenant-Id header (REQUIRED by the backend for tenant-scoped
+//    routes; it also acts as a CSRF defense since custom headers force a CORS
+//    preflight that the attacker origin can't satisfy)
 //  - unwraps { data } / { error }
-//
-// Both pieces of state — token + tenantId — must stay in sync. AuthContext owns that.
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
@@ -24,6 +25,7 @@ interface RequestOpts {
   method?: string;
   body?: unknown;
   query?: Record<string, string | number | undefined | null>;
+  /** @deprecated Auth now uses an httpOnly cookie. Kept for call-site compat; ignored. */
   token?: string | null;
   tenantId?: string | null;
 }
@@ -39,20 +41,22 @@ function buildUrl(path: string, query?: RequestOpts['query']): string {
   return qs ? `${BASE}${path}?${qs}` : `${BASE}${path}`;
 }
 
-function handle401(path: string, opts: RequestOpts, status: number) {
-  if (status === 401 && opts.token && !path.startsWith('/auth/')) {
+function handle401(path: string, status: number) {
+  // Tell the AuthContext to drop session state. Skip on /auth/* so a failed
+  // login attempt doesn't fire a spurious "logged out" event.
+  if (status === 401 && !path.startsWith('/auth/')) {
     window.dispatchEvent(new CustomEvent('terp:auth-invalidated'));
   }
 }
 
 export async function api<T>(path: string, opts: RequestOpts = {}): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (opts.token) headers.Authorization = `Bearer ${opts.token}`;
   if (opts.tenantId) headers['X-Tenant-Id'] = opts.tenantId;
 
   const res = await fetch(buildUrl(path, opts.query), {
     method: opts.method ?? 'GET',
     headers,
+    credentials: 'include',
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
   });
 
@@ -61,7 +65,7 @@ export async function api<T>(path: string, opts: RequestOpts = {}): Promise<T> {
 
   if (!res.ok) {
     const err = json.error ?? { code: 'UNKNOWN', message: res.statusText };
-    handle401(path, opts, res.status);
+    handle401(path, res.status);
     throw new ApiError(res.status, err.code, err.message, err.details);
   }
   return json.data as T;
@@ -74,12 +78,12 @@ export async function apiUpload<T>(
   opts: Omit<RequestOpts, 'body' | 'method'> = {},
 ): Promise<T> {
   const headers: Record<string, string> = {};
-  if (opts.token) headers.Authorization = `Bearer ${opts.token}`;
   if (opts.tenantId) headers['X-Tenant-Id'] = opts.tenantId;
 
   const res = await fetch(buildUrl(path, opts.query), {
     method: 'POST',
     headers,
+    credentials: 'include',
     body: formData,
   });
 
@@ -88,7 +92,7 @@ export async function apiUpload<T>(
 
   if (!res.ok) {
     const err = json.error ?? { code: 'UNKNOWN', message: res.statusText };
-    handle401(path, opts, res.status);
+    handle401(path, res.status);
     throw new ApiError(res.status, err.code, err.message, err.details);
   }
   return json.data as T;

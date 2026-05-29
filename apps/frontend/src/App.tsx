@@ -15,7 +15,17 @@ import { BusinessSettingsPage } from './pages/settings/BusinessSettingsPage';
 import { SettingsLayout } from './pages/settings/SettingsLayout';
 
 export default function App() {
-  const { session } = useAuth();
+  const { session, ready } = useAuth();
+
+  // Avoid a flash of the /auth page while the cookie-based session is being
+  // restored from GET /auth/me on first load.
+  if (!ready) {
+    return (
+      <div className="app-shell app-shell--booting">
+        <p className="muted" style={{ padding: 24 }}>Loading…</p>
+      </div>
+    );
+  }
 
   if (!session) {
     return (

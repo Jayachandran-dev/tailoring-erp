@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 import { env } from './config/env';
 import routes from './routes';
 import { errorMiddleware } from './middleware/error';
@@ -20,6 +21,7 @@ export function createApp() {
   );
   app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
   app.use(express.json({ limit: '1mb' }));
+  app.use(cookieParser());
   app.use(morgan(env.NODE_ENV === 'development' ? 'dev' : 'combined'));
 
   // Global, gentle rate limit. Tighter limits live in the OTP service itself.
