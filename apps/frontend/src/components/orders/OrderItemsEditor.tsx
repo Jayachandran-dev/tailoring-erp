@@ -68,11 +68,17 @@ export function OrderItemsEditor({ items, onChange, onAddDesign, measurements = 
       )}
 
       {items.map((it, idx) => {
-        // Show measurements that either match the item's garment type or are
-        // labelled 'custom' (so a generic set is always reachable).
-        const candidates = measurements.filter(
-          (m) => m.garmentType === (it.garmentType ?? 'custom') || m.garmentType === 'custom',
-        );
+        // Pick which saved measurements to surface for this row:
+        // - if the row's garment type is 'custom' (the default), show ALL —
+        //   the user often hasn't reclassified the row yet and still wants
+        //   to attach e.g. their saved "Shirt" measurement;
+        // - otherwise show measurements matching this garment type, plus any
+        //   generic ones labelled 'custom'.
+        const rowType = it.garmentType ?? 'custom';
+        const candidates =
+          rowType === 'custom'
+            ? measurements
+            : measurements.filter((m) => m.garmentType === rowType || m.garmentType === 'custom');
         const snapKeys = it.measurementSnapshot ? Object.keys(it.measurementSnapshot) : [];
         return (
         <div key={idx} className="item-row">
@@ -128,7 +134,7 @@ export function OrderItemsEditor({ items, onChange, onAddDesign, measurements = 
                     ))}
                     {candidates.length === 0 && (
                       <option disabled value="__none">
-                        (no saved measurements for {it.garmentType ?? 'custom'})
+                        (no saved measurements for {rowType})
                       </option>
                     )}
                   </select>
