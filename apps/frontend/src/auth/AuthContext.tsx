@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, ApiError } from '../api/client';
+import { setSentrySession } from '../observability/sentry';
 
 // The JWT lives in an httpOnly cookie set by the backend; the SPA never sees
 // it. `token` is kept as an empty placeholder so existing call-sites that read
@@ -61,6 +62,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener('terp:auth-invalidated', onInvalidated);
     return () => window.removeEventListener('terp:auth-invalidated', onInvalidated);
   }, []);
+
+  // Keep Sentry's per-user scope in sync with the in-memory session so every
+  // captured event is tagged with tenantId / userId / role.
+  useEffect(() => {
+    setSentrySession(session);
+  }, [session]);
 
   const value = useMemo<AuthCtx>(
     () => ({

@@ -20,6 +20,12 @@ const EnvSchema = z.object({
     .string()
     .transform((v) => v === 'true')
     .default('false'),
+
+  // Sentry (all optional - omit DSN to disable error reporting entirely).
+  SENTRY_DSN: z.string().url().optional(),
+  SENTRY_ENVIRONMENT: z.string().optional(),
+  SENTRY_RELEASE: z.string().optional(),
+  SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
 });
 
 const parsed = EnvSchema.safeParse(process.env);

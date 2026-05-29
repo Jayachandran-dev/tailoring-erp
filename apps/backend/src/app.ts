@@ -8,6 +8,7 @@ import { env } from './config/env';
 import routes from './routes';
 import { errorMiddleware } from './middleware/error';
 import { auditMiddleware } from './middleware/audit';
+import { sentryTagMiddleware, setupSentryErrorHandler } from './observability/sentry';
 import { UPLOADS_ROOT } from './utils/uploads';
 
 export function createApp() {
@@ -70,8 +71,16 @@ export function createApp() {
   // attach the res.on('finish') listener once.
   app.use(auditMiddleware);
 
+  // Tag the per-request Sentry scope with tenantId / userId / role pulled
+  // from the JWT (no-op when SENTRY_DSN is unset).
+  app.use(sentryTagMiddleware);
+
   app.use('/api', routes);
 
+  // Sentry's express error handler must run BEFORE our errorMiddleware so it
+  // gets a chance to capture the exception. It then calls next(err) and our
+  // errorMiddleware sends the JSON response.
+  setupSentryErrorHandler(app);
   app.use(errorMiddleware);
 
   return app;

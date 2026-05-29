@@ -1,3 +1,7 @@
+// Init Sentry FIRST so its instrumentation can hook everything else.
+import { initSentry } from './observability/sentry';
+initSentry();
+
 import { createApp } from './app';
 import { env } from './config/env';
 import { logger } from './config/logger';
