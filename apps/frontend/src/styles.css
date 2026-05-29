@@ -1942,19 +1942,34 @@ button:has(> svg) {
   flex-direction: column;
   gap: 12px;
   /* Modal body provides its own padding; fill nearly full viewport height. */
-  height: min(78vh, 720px);
+  height: min(82vh, 820px);
 }
 .pdf-viewer__frame {
   flex: 1;
   width: 100%;
   border: 1px solid var(--border, #e5e7eb);
   border-radius: 8px;
-  background: #525659; /* matches Chromium PDF viewer chrome */
-  min-height: 320px;
+  background: #f3f4f6; /* light gray surround — viewer chrome is hidden */
+  min-height: 360px;
 }
 .pdf-viewer__actions {
   display: flex;
   flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding-top: 10px;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+.pdf-viewer__actions-group {
+  display: inline-flex;
   gap: 8px;
   align-items: center;
+}
+.pdf-viewer__close {
+  margin-left: auto;
+}
+.pdf-viewer__actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }

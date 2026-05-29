@@ -48,6 +48,11 @@ export function PdfViewerModal({
     };
   }, [objectUrl]);
 
+  // PDF viewer URL fragment hides Chrome / Edge / Firefox built-in toolbar &
+  // side panel so the dialog shows just the document — our own buttons below
+  // handle download / open / share. (See Adobe's "PDF Open Parameters".)
+  const frameUrl = objectUrl ? `${objectUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH` : null;
+
   const [copied, setCopied] = useState(false);
 
   async function copyShare() {
@@ -71,58 +76,76 @@ export function PdfViewerModal({
     window.open(url, '_blank', 'noopener,noreferrer');
   }
 
+  function download() {
+    if (!objectUrl) return;
+    // Programmatic <a download> click so the button styling stays consistent.
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  function openInNewTab() {
+    if (!objectUrl) return;
+    // Open WITHOUT the toolbar=0 hash so the user gets the full browser viewer.
+    window.open(objectUrl, '_blank', 'noopener,noreferrer');
+  }
+
   return (
     <Modal open={open} onClose={onClose} title={title} size="lg">
       <div className="pdf-viewer">
         {!blob && <p className="muted">Preparing PDF…</p>}
 
-        {blob && objectUrl && (
+        {blob && frameUrl && (
           <iframe
             title={title}
-            src={objectUrl}
+            src={frameUrl}
             className="pdf-viewer__frame"
           />
         )}
 
         <div className="pdf-viewer__actions">
-          {blob && objectUrl && (
-            <>
-              <a
-                className="primary"
-                href={objectUrl}
-                download={filename}
-                style={{ textDecoration: 'none' }}
-              >
-                <Icon name="upload" size={16} style={{ transform: 'rotate(180deg)' }} />
-                <span>Download</span>
-              </a>
-              <a
-                className="ghost"
-                href={objectUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ textDecoration: 'none' }}
-              >
-                <Icon name="external-link" size={16} />
-                <span>Open in new tab</span>
-              </a>
-            </>
-          )}
+          <div className="pdf-viewer__actions-group">
+            <button
+              type="button"
+              className="primary"
+              onClick={download}
+              disabled={!objectUrl}
+            >
+              <Icon name="upload" size={16} style={{ transform: 'rotate(180deg)' }} />
+              <span>Download</span>
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              onClick={openInNewTab}
+              disabled={!objectUrl}
+            >
+              <Icon name="external-link" size={16} />
+              <span>Open in new tab</span>
+            </button>
+          </div>
 
           {shareUrl && (
-            <>
+            <div className="pdf-viewer__actions-group">
               <button type="button" className="ghost" onClick={copyShare}>
                 <Icon name={copied ? 'check' : 'copy'} size={16} />
-                <span>{copied ? 'Copied' : 'Copy share link'}</span>
+                <span>{copied ? 'Copied' : 'Copy link'}</span>
               </button>
               <button type="button" className="ghost" onClick={openWhatsApp}>
                 <Icon name="message-circle" size={16} />
                 <span>WhatsApp</span>
               </button>
-            </>
+            </div>
           )}
 
-          <button type="button" className="ghost" onClick={onClose} style={{ marginLeft: 'auto' }}>
+          <button
+            type="button"
+            className="ghost pdf-viewer__close"
+            onClick={onClose}
+          >
             Close
           </button>
         </div>
