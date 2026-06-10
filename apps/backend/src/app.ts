@@ -74,7 +74,12 @@ export function createApp() {
   // Tag the per-request Sentry scope with tenantId / userId / role pulled
   // from the JWT (no-op when SENTRY_DSN is unset).
   app.use(sentryTagMiddleware);
-
+  app.get('/', (_req, res) => {
+    res.status(200).json({
+      status: 'ok',
+      service: 'tailoring-erp-backend'
+    });
+  });
   app.use('/api', routes);
 
   // Sentry's express error handler must run BEFORE our errorMiddleware so it
