@@ -19,6 +19,8 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { StatusBadge, PriorityBadge } from '../../components/StatusBadge';
 import { UpiQrPreview } from '../../components/payments/UpiQrPreview';
 import { Icon } from '../../components/Icon';
+import { ShareOrderMenu } from '../../components/orders/ShareOrderMenu';
+import { PdfViewerModal } from '../../components/PdfViewerModal';
 import { rupees, rupeesToCents, shortDate, shortDateTime, signedRupees } from '../../utils/format';
 
 const NEXT_STATUS: Record<OrderStatus, OrderStatus[]> = {
@@ -55,6 +57,11 @@ export function OrderDetailPage() {
 
   const [payOpen, setPayOpen] = useState<'payment' | 'refund' | null>(null);
   const [delOpen, setDelOpen] = useState(false);
+  // Invoice PDF preview dialog state — fetched lazily on first open.
+  const [pdfOpen, setPdfOpen] = useState(false);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  const [pdfShareUrl, setPdfShareUrl] = useState<string | null>(null);
+  const [pdfKind, setPdfKind] = useState<'invoice' | 'work-order'>('invoice');
 
   const load = useCallback(async () => {
     if (!ctx) return;
@@ -118,6 +125,60 @@ export function OrderDetailPage() {
     }
   }
 
+  // Open the invoice in our in-app PDF dialog (preview + download + share).
+  // We fetch the PDF bytes ourselves so the X-Tenant-Id header is sent —
+  // tenantContext middleware requires it for every authed request — then mint
+  // an object URL inside the modal. The current active share link (if any)
+  // is loaded in parallel so the Share buttons inside the dialog work.
+  async function openInvoice() {
+    if (!ctx || !order) return;
+    setBusy(true);
+    setError(null);
+    setPdfBlob(null);
+    setPdfShareUrl(null);
+    setPdfKind('invoice');
+    setPdfOpen(true);
+    try {
+      const [blob, link] = await Promise.all([
+        ordersApi.invoicePdf(ctx, order.id),
+        ordersApi.getShareLink(ctx, order.id).catch(() => null),
+      ]);
+      setPdfBlob(blob);
+      setPdfShareUrl(link?.url ?? null);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Failed to generate invoice');
+      setPdfOpen(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Tailor-facing work order: no prices, includes measurements.
+  async function openWorkOrder() {
+    if (!ctx || !order) return;
+    setBusy(true);
+    setError(null);
+    setPdfBlob(null);
+    setPdfShareUrl(null); // tailor copy never gets the customer share link
+    setPdfKind('work-order');
+    setPdfOpen(true);
+    try {
+      const blob = await ordersApi.workOrderPdf(ctx, order.id);
+      setPdfBlob(blob);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Failed to generate work order');
+      setPdfOpen(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function closeInvoice() {
+    setPdfOpen(false);
+    // Drop the blob so memory can be reclaimed; URL is revoked inside the modal.
+    setPdfBlob(null);
+  }
+
   if (loading) return <p className="muted">Loading…</p>;
   if (error && !order) return <div className="error">{error}</div>;
   if (!order) return null;
@@ -146,6 +207,14 @@ export function OrderDetailPage() {
         subtitle={`Created ${shortDateTime(order.createdAt)}`}
         actions={
           <>
+            <button type="button" className="ghost" onClick={openInvoice} disabled={busy}>
+              <Icon name="file-text" size={16} />
+              <span>Invoice (PDF)</span>
+            </button>
+            <button type="button" className="ghost" onClick={openWorkOrder} disabled={busy}>
+              <Icon name="file-text" size={16} />
+              <span>Work order</span>
+            </button>
             <button type="button" className="ghost" onClick={() => window.print()}>
               <Icon name="printer" size={16} />
               <span>Print</span>
@@ -209,6 +278,21 @@ export function OrderDetailPage() {
       {overpaid > 0 && (
         <div className="banner warn" data-print-hide>
           <strong>Overpaid by {rupees(overpaid)}.</strong> Use “Record refund” to return the extra to the customer.
+        </div>
+      )}
+
+      {/* Customer-facing share link (WhatsApp / copy / preview / revoke) */}
+      {ctx && order.customer && (
+        <div data-print-hide>
+          <ShareOrderMenu
+            ctx={ctx}
+            orderId={order.id}
+            orderNumber={order.orderNumber}
+            customerName={order.customer.name}
+            customerMobile={order.customer.mobile}
+            status={order.status}
+            businessName={session?.tenant.name ?? 'your tailor'}
+          />
         </div>
       )}
 
@@ -423,6 +507,21 @@ export function OrderDetailPage() {
         variant="danger"
         onCancel={() => setDelOpen(false)}
         onConfirm={deleteOrder}
+      />
+
+      <PdfViewerModal
+        open={pdfOpen}
+        onClose={closeInvoice}
+        title={
+          pdfKind === 'invoice'
+            ? `Invoice — ${order.orderNumber ?? ''}`
+            : `Work order — ${order.orderNumber ?? ''}`
+        }
+        blob={pdfBlob}
+        filename={`${pdfKind === 'invoice' ? 'invoice' : 'work-order'}-${(order.orderNumber ?? 'order').replace(/[^\w.-]+/g, '_')}.pdf`}
+        shareUrl={pdfKind === 'invoice' ? pdfShareUrl : null}
+        shareToPhone={order.customer?.mobile ?? null}
+        shareMessage={`Hi ${order.customer?.name ?? ''}, here is your invoice for order ${order.orderNumber ?? ''}.`}
       />
     </>
   );

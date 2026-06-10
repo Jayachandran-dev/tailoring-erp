@@ -6,6 +6,17 @@ const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
 
+  // Where the user-visible SPA is reachable. Used to build public links
+  // (customer order share, invoice URL). Defaults to CORS_ORIGIN for dev.
+  PUBLIC_APP_URL: z.string().optional(),
+
+  // Optional path to a TrueType / OpenType font used for invoice PDFs.
+  // When set, the font is registered with pdfkit and we render the actual
+  // ₹ glyph (U+20B9). When unset, we fall back to Helvetica + "Rs. " prefix
+  // because the standard PDF fonts don't include the rupee glyph.
+  // Recommended: Noto Sans, Inter, Lato — anything with broad Unicode coverage.
+  INVOICE_FONT_PATH: z.string().optional(),
+
   DATABASE_URL: z.string().url(),
   DATABASE_BASE_URL: z.string().url(),
 
@@ -20,6 +31,12 @@ const EnvSchema = z.object({
     .string()
     .transform((v) => v === 'true')
     .default('false'),
+
+  // Sentry (all optional - omit DSN to disable error reporting entirely).
+  SENTRY_DSN: z.string().url().optional(),
+  SENTRY_ENVIRONMENT: z.string().optional(),
+  SENTRY_RELEASE: z.string().optional(),
+  SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
 });
 
 const parsed = EnvSchema.safeParse(process.env);

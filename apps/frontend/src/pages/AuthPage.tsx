@@ -14,10 +14,11 @@ interface OtpIssued {
 }
 
 interface AuthResult {
-  token: string;
+  // The JWT now lives in an httpOnly cookie set by the backend, not in this body.
   expiresAt: string;
   tenant: { id: string; name: string; slug: string };
   user: { id: string; mobile: string; displayName: string | null };
+  role: 'OWNER' | 'MANAGER' | 'STAFF';
 }
 
 export function AuthPage() {
@@ -81,10 +82,11 @@ export function AuthPage() {
           : { requestId: issued.requestId, mobile: issued.mobile, code };
       const data = await api<AuthResult>(path, { method: 'POST', body });
       const session: Session = {
-        token: data.token,
+        token: '', // JWT is in the httpOnly cookie; placeholder kept for back-compat
         expiresAt: data.expiresAt,
         tenant: data.tenant,
         user: data.user,
+        role: data.role,
       };
       signIn(session);
     } catch (err) {

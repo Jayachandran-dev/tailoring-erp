@@ -12,15 +12,32 @@ import { OrderCreatePage } from './pages/orders/OrderCreatePage';
 import { OrderDetailPage } from './pages/orders/OrderDetailPage';
 import { PaymentSettingsPage } from './pages/settings/PaymentSettingsPage';
 import { BusinessSettingsPage } from './pages/settings/BusinessSettingsPage';
+import { TeamSettingsPage } from './pages/settings/TeamSettingsPage';
 import { SettingsLayout } from './pages/settings/SettingsLayout';
+import { InvitePage } from './pages/InvitePage';
+import { PublicOrderPage } from './pages/PublicOrderPage';
 
 export default function App() {
-  const { session } = useAuth();
+  const { session, ready } = useAuth();
+
+  // Avoid a flash of the /auth page while the cookie-based session is being
+  // restored from GET /auth/me on first load.
+  if (!ready) {
+    return (
+      <div className="app-shell app-shell--booting">
+        <p className="muted" style={{ padding: 24 }}>Loading…</p>
+      </div>
+    );
+  }
 
   if (!session) {
     return (
       <div className="app-shell">
         <Routes>
+          {/* Customer-facing public order link — token-gated, no auth. */}
+          <Route path="/p/order/:token" element={<PublicOrderPage />} />
+          {/* Invite acceptance must be reachable while signed-out. */}
+          <Route path="/invite/:token" element={<InvitePage />} />
           <Route path="/auth" element={<AuthPage />} />
           <Route path="*" element={<Navigate to="/auth" replace />} />
         </Routes>
@@ -30,6 +47,8 @@ export default function App() {
 
   return (
     <Routes>
+      {/* Public order page works for signed-in users too (e.g. previewing). */}
+      <Route path="/p/order/:token" element={<PublicOrderPage />} />
       <Route element={<AppLayout />}>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/customers" element={<CustomersListPage />} />
@@ -44,8 +63,11 @@ export default function App() {
           <Route index element={<Navigate to="business" replace />} />
           <Route path="business" element={<BusinessSettingsPage />} />
           <Route path="payments" element={<PaymentSettingsPage />} />
+          <Route path="team" element={<TeamSettingsPage />} />
         </Route>
         <Route path="/auth" element={<Navigate to="/" replace />} />
+        {/* If a signed-in user clicks an invite link, send them back to the dashboard. */}
+        <Route path="/invite/:token" element={<Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

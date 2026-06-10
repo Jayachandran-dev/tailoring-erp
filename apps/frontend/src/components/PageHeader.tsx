@@ -9,7 +9,7 @@ interface Props {
 }
 
 export function PageHeader({ title, subtitle, back, actions }: Props) {
-  const nav = useNavigate();
+  const nav = useNavigate(); 
   return (
     <div className="page-header">
       <div>

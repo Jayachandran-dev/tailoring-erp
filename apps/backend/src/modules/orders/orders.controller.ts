@@ -21,6 +21,10 @@ import { requireAuth } from '../../middleware/auth';
 import { tenantContext } from '../../middleware/tenantContext';
 import { ownerOrManager } from '../../middleware/role';
 import { badRequest, notFound } from '../../utils/errors';
+import { env } from '../../config/env';
+import * as shareService from '../sharing/share.service';
+import { renderInvoicePdf } from '../sharing/invoice.service';
+import { renderWorkOrderPdf } from '../sharing/workOrder.service';
 
 const router = Router();
 router.use(requireAuth, tenantContext);
@@ -459,6 +463,202 @@ router.delete('/:id', async (req, res, next) => {
     if (!existing) throw notFound('Order not found');
     await req.tenantDb!.order.delete({ where: { id: existing.id } });
     res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ===================================================================
+// Customer-facing share link + invoice PDF (tenant-scoped, authed)
+// ===================================================================
+
+function publicOrderUrl(token: string): string {
+  // PUBLIC_APP_URL is the user-visible SPA origin (falls back to CORS_ORIGIN).
+  const base = (env.PUBLIC_APP_URL || env.CORS_ORIGIN).replace(/\/+$/, '');
+  return `${base}/p/order/${token}`;
+}
+
+// Create-or-return the active share link for this order. Idempotent.
+router.post('/:id/share-link', async (req, res, next) => {
+  try {
+    const orderId = String(req.params.id);
+    const exists = await req.tenantDb!.order.findUnique({ where: { id: orderId }, select: { id: true } });
+    if (!exists) throw notFound('Order not found');
+    const tok = await shareService.getOrCreate(req.tenantId!, req.tenantSchema!, orderId);
+    res.status(201).json({
+      data: {
+        token: tok.token,
+        url: publicOrderUrl(tok.token),
+        createdAt: tok.createdAt,
+        lastViewedAt: tok.lastViewedAt,
+        viewCount: tok.viewCount,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Read the currently-active share link (if any) — doesn't mint a new one.
+router.get('/:id/share-link', async (req, res, next) => {
+  try {
+    const orderId = String(req.params.id);
+    const tok = await shareService.getActive(req.tenantId!, orderId);
+    if (!tok) {
+      res.json({ data: null });
+      return;
+    }
+    res.json({
+      data: {
+        token: tok.token,
+        url: publicOrderUrl(tok.token),
+        createdAt: tok.createdAt,
+        lastViewedAt: tok.lastViewedAt,
+        viewCount: tok.viewCount,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Revoke any active share link for this order. Idempotent — returns the
+// number of links revoked (0 if none was active).
+router.delete('/:id/share-link', async (req, res, next) => {
+  try {
+    const orderId = String(req.params.id);
+    const count = await shareService.revoke(req.tenantId!, orderId);
+    res.json({ data: { revoked: count } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Stream a PDF invoice for the order.
+router.get('/:id/invoice.pdf', async (req, res, next) => {
+  try {
+    const orderId = String(req.params.id);
+    const order = await req.tenantDb!.order.findUnique({
+      where: { id: orderId },
+      include: {
+        customer: { select: { name: true, mobile: true, address: true } },
+        items: { orderBy: { sortOrder: 'asc' } },
+        payments: { orderBy: { paidAt: 'desc' } },
+      },
+    });
+    if (!order) throw notFound('Order not found');
+    const business = await req.tenantDb!.businessSettings.findFirst();
+    if (!business) throw badRequest('Configure Business Settings before printing an invoice');
+
+    const filename = `invoice-${(order.orderNumber || order.id).replace(/[^a-z0-9-]/gi, '_')}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+
+    renderInvoicePdf(
+      {
+        orderNumber: order.orderNumber,
+        createdAt: order.createdAt,
+        status: order.status,
+        notes: order.notes,
+        discountCents: order.discountCents,
+        totalCents: order.totalCents,
+        paidCents: order.paidCents,
+        dueDate: order.dueDate,
+        customer: {
+          name: order.customer.name,
+          mobile: order.customer.mobile,
+          address: order.customer.address,
+        },
+        items: order.items.map((it) => ({
+          name: it.name,
+          garmentType: it.garmentType,
+          qty: it.qty,
+          unitPriceCents: it.unitPriceCents,
+          notes: it.notes,
+        })),
+        payments: order.payments.map((p) => ({
+          amountCents: p.amountCents,
+          method: p.method,
+          paidAt: p.paidAt,
+          reference: p.reference,
+        })),
+      },
+      {
+        businessName: business.businessName,
+        tagline: business.tagline,
+        phone: business.phone,
+        email: business.email,
+        addressLine1: business.addressLine1,
+        addressLine2: business.addressLine2,
+        city: business.city,
+        state: business.state,
+        pincode: business.pincode,
+        gstin: business.gstin,
+        currency: business.currency,
+        logoUrl: business.logoUrl,
+        invoicePrefix: business.invoicePrefix,
+        invoiceFooter: business.invoiceFooter,
+        terms: business.terms,
+      },
+      res,
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Stream a tailor-facing work-order PDF (no prices, includes measurements).
+router.get('/:id/work-order.pdf', async (req, res, next) => {
+  try {
+    const orderId = String(req.params.id);
+    const order = await req.tenantDb!.order.findUnique({
+      where: { id: orderId },
+      include: {
+        customer: { select: { name: true, mobile: true, address: true } },
+        items: { orderBy: { sortOrder: 'asc' } },
+      },
+    });
+    if (!order) throw notFound('Order not found');
+    const business = await req.tenantDb!.businessSettings.findFirst();
+    if (!business) throw badRequest('Configure Business Settings before printing a work order');
+
+    const filename = `work-order-${(order.orderNumber || order.id).replace(/[^a-z0-9-]/gi, '_')}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+
+    renderWorkOrderPdf(
+      {
+        orderNumber: order.orderNumber,
+        createdAt: order.createdAt,
+        status: order.status,
+        notes: order.notes,
+        priority: order.priority,
+        dueDate: order.dueDate,
+        customer: {
+          name: order.customer.name,
+          mobile: order.customer.mobile,
+          address: order.customer.address,
+        },
+        items: order.items.map((it) => ({
+          name: it.name,
+          garmentType: it.garmentType,
+          qty: it.qty,
+          notes: it.notes,
+          measurementSnapshot:
+            (it.measurementSnapshot as Record<string, string | number> | null) ?? null,
+        })),
+      },
+      {
+        businessName: business.businessName,
+        phone: business.phone,
+        addressLine1: business.addressLine1,
+        city: business.city,
+        state: business.state,
+        pincode: business.pincode,
+        logoUrl: business.logoUrl,
+      },
+      res,
+    );
   } catch (err) {
     next(err);
   }

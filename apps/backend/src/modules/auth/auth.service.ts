@@ -220,6 +220,30 @@ export async function logout(sessionId: string) {
   await revokeSession(sessionId);
 }
 
+// Returns the current session's identity for the frontend to rehydrate state
+// after a page reload (since the JWT lives in an httpOnly cookie the SPA can't
+// read it). Trusts the JWT payload that already passed requireAuth + session
+// touch — no extra DB hit unless we want one.
+export async function getMe(auth: {
+  sub: string;
+  sid: string;
+  mobile: string;
+  tenantId: string;
+  schemaName: string;
+  role: 'OWNER' | 'MANAGER' | 'STAFF';
+}) {
+  const [user, tenant] = await Promise.all([
+    platformDb.platformUser.findUnique({ where: { id: auth.sub } }),
+    platformDb.tenant.findUnique({ where: { id: auth.tenantId } }),
+  ]);
+  if (!user || !tenant) throw notFound('Session subject no longer exists');
+  return {
+    tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
+    user:   { id: user.id, mobile: user.mobile, displayName: user.displayName },
+    role:   auth.role,
+  };
+}
+
 // ---------- helpers ----------
 function slugify(input: string): string {
   const s = input

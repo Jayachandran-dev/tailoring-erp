@@ -6,6 +6,7 @@ import { Icon, type IconName } from '../../components/Icon';
 const TABS: { to: string; label: string; icon: IconName }[] = [
   { to: '/settings/business', label: 'Business', icon: 'building' },
   { to: '/settings/payments', label: 'Payments', icon: 'credit-card' },
+  { to: '/settings/team', label: 'Team', icon: 'users' },
 ];
 
 export function SettingsLayout() {

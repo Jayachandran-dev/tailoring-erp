@@ -1,68 +1,59 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, ApiError } from '../api/client';
+import { setSentrySession } from '../observability/sentry';
 
+// The JWT lives in an httpOnly cookie set by the backend; the SPA never sees
+// it. `token` is kept as an empty placeholder so existing call-sites that read
+// `session.token` keep compiling — the api client ignores it.
 export interface Session {
   token: string;
-  expiresAt: string; // ISO; server-issued, also enforced locally
+  expiresAt: string; // ISO; informational only — server is the source of truth
   tenant: { id: string; name: string; slug: string };
   user: { id: string; mobile: string; displayName: string | null };
+  role: 'OWNER' | 'MANAGER' | 'STAFF';
 }
 
 interface AuthCtx {
   session: Session | null;
+  ready: boolean; // false until the /auth/me bootstrap completes
   signIn: (s: Session) => void;
   signOut: () => void | Promise<void>;
 }
 
 const Ctx = createContext<AuthCtx | null>(null);
-const STORAGE_KEY = 'terp.session.v1';
 
-function readStoredSession(): Session | null {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Session;
-    // Local expiry check — clears expired sessions on app boot without hitting the server.
-    if (parsed.expiresAt && new Date(parsed.expiresAt).getTime() <= Date.now()) {
-      localStorage.removeItem(STORAGE_KEY);
-      return null;
-    }
-    return parsed;
-  } catch {
-    localStorage.removeItem(STORAGE_KEY);
-    return null;
-  }
-}
+// Shape returned by GET /auth/me (token is in the cookie, not in the body).
+type MeResponse = Omit<Session, 'token' | 'expiresAt'> & { expiresAt?: string };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(() => readStoredSession());
+  const [session, setSession] = useState<Session | null>(null);
+  const [ready, setReady] = useState(false);
 
+  // Boot: ask the server who we are. If the cookie is missing/invalid we get
+  // a 401 and stay logged out. Otherwise we hydrate the in-memory session.
   useEffect(() => {
-    if (session) localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-    else localStorage.removeItem(STORAGE_KEY);
-  }, [session]);
-
-  // Auto-clear when the local clock crosses expiresAt (handles a tab left open for days).
-  useEffect(() => {
-    if (!session) return;
-    const ms = new Date(session.expiresAt).getTime() - Date.now();
-    if (ms <= 0) {
-      setSession(null);
-      return;
-    }
-    const t = window.setTimeout(() => setSession(null), Math.min(ms, 2_147_483_000));
-    return () => window.clearTimeout(t);
-  }, [session]);
-
-  // Cross-tab sync: if another tab signs out, this tab follows.
-  useEffect(() => {
-    function onStorage(e: StorageEvent) {
-      if (e.key === STORAGE_KEY) {
-        setSession(e.newValue ? (JSON.parse(e.newValue) as Session) : null);
+    let cancelled = false;
+    (async () => {
+      try {
+        const me = await api<MeResponse>('/auth/me');
+        if (cancelled) return;
+        setSession({
+          token: '',
+          expiresAt: me.expiresAt ?? '',
+          tenant: me.tenant,
+          user: me.user,
+          role: me.role,
+        });
+      } catch (err) {
+        if (!(err instanceof ApiError)) console.error(err);
+        // Any error (401, network, etc.) → treat as signed-out.
+      } finally {
+        if (!cancelled) setReady(true);
       }
-    }
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Global "auth invalidated" event raised by the API client on 401.
@@ -72,23 +63,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('terp:auth-invalidated', onInvalidated);
   }, []);
 
+  // Keep Sentry's per-user scope in sync with the in-memory session so every
+  // captured event is tagged with tenantId / userId / role.
+  useEffect(() => {
+    setSentrySession(session);
+  }, [session]);
+
   const value = useMemo<AuthCtx>(
     () => ({
       session,
+      ready,
       signIn: (s) => setSession(s),
       signOut: async () => {
-        // Best-effort server revocation; always clear locally regardless.
-        if (session) {
-          try {
-            await api('/auth/logout', { method: 'POST', token: session.token });
-          } catch (err) {
-            if (!(err instanceof ApiError)) throw err;
-          }
+        // Best-effort server revocation (also clears the cookie); always clear
+        // local state regardless of network outcome.
+        try {
+          await api('/auth/logout', { method: 'POST' });
+        } catch (err) {
+          if (!(err instanceof ApiError)) throw err;
         }
         setSession(null);
       },
     }),
-    [session],
+    [session, ready],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

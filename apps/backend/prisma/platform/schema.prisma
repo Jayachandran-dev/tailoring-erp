@@ -29,6 +29,7 @@ model Tenant {
 
   memberships  TenantMembership[]
   sessions     Session[]
+  invites      StaffInvite[]
 
   @@map("tenants")
   @@schema("platform")
@@ -53,6 +54,7 @@ model PlatformUser {
 
   memberships TenantMembership[]
   sessions    Session[]
+  invitesIssued StaffInvite[] @relation("InvitedBy")
 
   @@map("platform_users")
   @@schema("platform")
@@ -101,6 +103,7 @@ model OtpRequest {
 enum OtpPurpose {
   SIGNUP
   LOGIN
+  INVITE
 
   @@schema("platform")
 }
@@ -126,5 +129,79 @@ model Session {
 
   @@index([userId, revokedAt, expiresAt])
   @@map("sessions")
+  @@schema("platform")
+}
+
+// Pending invitation to join a tenant as MANAGER/STAFF. Created by an
+// OWNER/MANAGER; redeemed by the invitee via OTP. Tokens are opaque, single-use,
+// and time-bound. Revoked invites are kept for audit until purged.
+model StaffInvite {
+  id              String    @id @default(cuid())
+  tenantId        String    @map("tenant_id")
+  mobile          String
+  role            Role      @default(STAFF)
+  displayName     String?   @map("display_name")
+  // Opaque URL-safe token; the SPA passes it back when starting/verifying the invite.
+  token           String    @unique
+  invitedByUserId String    @map("invited_by_user_id")
+  expiresAt       DateTime  @map("expires_at")
+  consumedAt      DateTime? @map("consumed_at")
+  revokedAt       DateTime? @map("revoked_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  tenant     Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invitedBy  PlatformUser @relation("InvitedBy", fields: [invitedByUserId], references: [id])
+
+  @@index([tenantId, consumedAt, revokedAt, expiresAt])
+  @@index([mobile])
+  @@map("staff_invites")
+  @@schema("platform")
+}
+
+// Append-only audit trail of every mutation and authentication event. Used for
+// security review (who did what, when) and incident response. Never expose this
+// table to end users via a tenant-scoped route — it's an operator surface.
+//
+// `tenantId` / `userId` are nullable because a request can fail auth BEFORE we
+// know who the actor is (e.g. a signup attempt, or an unauthenticated POST).
+model AuditLog {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now()) @map("created_at")
+  tenantId   String?  @map("tenant_id")
+  userId     String?  @map("user_id")
+  role       Role?
+  method     String   // HTTP verb: POST / PUT / PATCH / DELETE
+  path       String   // request path (query string stripped)
+  status     Int      // HTTP status code returned
+  durationMs Int      @map("duration_ms")
+  ip         String?
+  userAgent  String?  @map("user_agent")
+  errorCode  String?  @map("error_code") // app error code on non-2xx (e.g. FORBIDDEN)
+
+  @@index([createdAt])
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+  @@schema("platform")
+}
+
+// Public share tokens for customer-facing order status pages and invoice PDFs.
+// Lives in the platform schema (not the tenant schema) so the unauthenticated
+// public route can look up tenant + order without needing an X-Tenant-Id header.
+// One active (un-revoked) token per orderId; rotating a link simply revokes the
+// old row and creates a new one.
+model OrderShareToken {
+  id           String    @id @default(cuid())
+  tenantId     String    @map("tenant_id")
+  schemaName   String    @map("schema_name")
+  orderId      String    @map("order_id")
+  token        String    @unique
+  createdAt    DateTime  @default(now()) @map("created_at")
+  revokedAt    DateTime? @map("revoked_at")
+  lastViewedAt DateTime? @map("last_viewed_at")
+  viewCount    Int       @default(0) @map("view_count")
+
+  @@index([tenantId, orderId])
+  @@map("order_share_tokens")
   @@schema("platform")
 }

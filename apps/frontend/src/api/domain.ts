@@ -1,6 +1,6 @@
 // Shared types and tiny API helpers for the customers domain.
 
-import { api, apiUpload } from '../api/client';
+import { api, apiBlob, apiUpload } from '../api/client';
 
 export interface Customer {
   id: string;
@@ -337,6 +337,61 @@ export const ordersApi = {
     api<Order>(`/orders/${id}/payments`, { ...ctx, method: 'POST', body }),
   removePayment: (ctx: Ctx, id: string, paymentId: string) =>
     api<Order>(`/orders/${id}/payments/${paymentId}`, { ...ctx, method: 'DELETE' }),
+
+  // Customer-facing share link
+  getShareLink: (ctx: Ctx, id: string) =>
+    api<ShareLink | null>(`/orders/${id}/share-link`, ctx),
+  createShareLink: (ctx: Ctx, id: string) =>
+    api<ShareLink>(`/orders/${id}/share-link`, { ...ctx, method: 'POST' }),
+  revokeShareLink: (ctx: Ctx, id: string) =>
+    api<{ revoked: number }>(`/orders/${id}/share-link`, { ...ctx, method: 'DELETE' }),
+
+  // Invoice PDF (returns a Blob the caller can open in a new tab or download).
+  invoicePdf: (ctx: Ctx, id: string) =>
+    apiBlob(`/orders/${id}/invoice.pdf`, ctx),
+
+  // Tailor-facing work-order PDF (no prices, includes measurements).
+  workOrderPdf: (ctx: Ctx, id: string) =>
+    apiBlob(`/orders/${id}/work-order.pdf`, ctx),
+};
+
+export interface ShareLink {
+  token: string;
+  url: string;
+  createdAt: string;
+  lastViewedAt: string | null;
+  viewCount: number;
+}
+
+// ============================================================
+// PUBLIC (customer-facing) order status
+// ============================================================
+export interface PublicOrderView {
+  business: {
+    name: string;
+    logoUrl: string | null;
+    phone: string | null;
+    currency: string;
+  };
+  order: {
+    number: string | null;
+    status: OrderStatus | string;
+    totalCents: number;
+    paidCents: number;
+    balanceCents: number;
+    discountCents: number;
+    dueDate: string | null;
+    createdAt: string;
+    deliveredAt: string | null;
+    customerName: string;
+    items: { name: string; garmentType: string; qty: number; unitPriceCents: number }[];
+    history: { status: OrderStatus | string; at: string }[];
+  };
+}
+
+export const publicOrdersApi = {
+  // Note: NO auth ctx — these routes are token-gated.
+  get: (token: string) => api<PublicOrderView>(`/public/orders/${token}`),
 };
 
 // ============================================================

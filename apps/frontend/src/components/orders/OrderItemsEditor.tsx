@@ -1,7 +1,7 @@
 // Editable list of order line items (design name, qty, unit price, garment type, notes).
 // Pure controlled component: parent owns the array.
 
-import type { Design, OrderItemInput } from '../../api/domain';
+import type { Design, Measurement, OrderItemInput } from '../../api/domain';
 import { assetUrl } from '../../api/client';
 import { rupees, rupeesToCents } from '../../utils/format';
 
@@ -9,9 +9,15 @@ interface Props {
   items: OrderItemInput[];
   onChange: (items: OrderItemInput[]) => void;
   onAddDesign: () => void;
+  /**
+   * The selected customer's saved measurements. When provided, each row gets a
+   * "Use saved measurement" dropdown that snapshots the chosen set onto the
+   * order item so the tailor work-order PDF can print it.
+   */
+  measurements?: Measurement[];
 }
 
-export function OrderItemsEditor({ items, onChange, onAddDesign }: Props) {
+export function OrderItemsEditor({ items, onChange, onAddDesign, measurements = [] }: Props) {
   function update(idx: number, patch: Partial<OrderItemInput>) {
     onChange(items.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
   }
@@ -23,6 +29,23 @@ export function OrderItemsEditor({ items, onChange, onAddDesign }: Props) {
       ...items,
       { name: 'Custom item', garmentType: 'custom', qty: 1, unitPriceCents: 0 },
     ]);
+  }
+
+  // When the user picks a saved measurement set, copy the id AND a value
+  // snapshot onto the item so the work-order PDF can render it without
+  // re-fetching, and so historical orders aren't broken if the measurement
+  // is later edited or deleted.
+  function attachMeasurement(idx: number, measurementId: string) {
+    if (!measurementId) {
+      update(idx, { measurementId: null, measurementSnapshot: null });
+      return;
+    }
+    const m = measurements.find((x) => x.id === measurementId);
+    if (!m) return;
+    update(idx, {
+      measurementId: m.id,
+      measurementSnapshot: { ...m.data },
+    });
   }
 
   const subtotal = items.reduce(
@@ -44,7 +67,20 @@ export function OrderItemsEditor({ items, onChange, onAddDesign }: Props) {
         <div className="muted small pad">No items added yet.</div>
       )}
 
-      {items.map((it, idx) => (
+      {items.map((it, idx) => {
+        // Pick which saved measurements to surface for this row:
+        // - if the row's garment type is 'custom' (the default), show ALL —
+        //   the user often hasn't reclassified the row yet and still wants
+        //   to attach e.g. their saved "Shirt" measurement;
+        // - otherwise show measurements matching this garment type, plus any
+        //   generic ones labelled 'custom'.
+        const rowType = it.garmentType ?? 'custom';
+        const candidates =
+          rowType === 'custom'
+            ? measurements
+            : measurements.filter((m) => m.garmentType === rowType || m.garmentType === 'custom');
+        const snapKeys = it.measurementSnapshot ? Object.keys(it.measurementSnapshot) : [];
+        return (
         <div key={idx} className="item-row">
           <div className="item-main">
             {it.imageUrl ? (
@@ -79,6 +115,37 @@ export function OrderItemsEditor({ items, onChange, onAddDesign }: Props) {
                   placeholder="Notes (optional)"
                 />
               </div>
+              {/* Measurement picker — only renders when the customer has any */}
+              {measurements.length > 0 && (
+                <div className="item-measurement-row">
+                  <label className="muted small">Measurements:</label>
+                  <select
+                    value={it.measurementId ?? ''}
+                    onChange={(e) => attachMeasurement(idx, e.target.value)}
+                  >
+                    <option value="">— none —</option>
+                    {candidates.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label || m.garmentType}
+                        {' · '}
+                        {Object.keys(m.data).length} field
+                        {Object.keys(m.data).length === 1 ? '' : 's'}
+                      </option>
+                    ))}
+                    {candidates.length === 0 && (
+                      <option disabled value="__none">
+                        (no saved measurements for {rowType})
+                      </option>
+                    )}
+                  </select>
+                  {snapKeys.length > 0 && (
+                    <span className="muted small">
+                      {snapKeys.slice(0, 3).join(', ')}
+                      {snapKeys.length > 3 ? `, +${snapKeys.length - 3}` : ''}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <div className="num">
@@ -104,7 +171,8 @@ export function OrderItemsEditor({ items, onChange, onAddDesign }: Props) {
             </button>
           </div>
         </div>
-      ))}
+      );
+      })}
 
       <div className="items-actions">
         <button type="button" className="primary" onClick={onAddDesign}>

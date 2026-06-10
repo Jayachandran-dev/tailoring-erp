@@ -11,17 +11,20 @@ export function errorMiddleware(
   _next: NextFunction,
 ): void {
   if (err instanceof ZodError) {
+    res.locals.errorCode = 'VALIDATION_ERROR';
     res.status(400).json({
       error: { code: 'VALIDATION_ERROR', message: 'Invalid input', details: err.flatten() },
     });
     return;
   }
   if (err instanceof AppError) {
+    res.locals.errorCode = err.code;
     res.status(err.status).json({
       error: { code: err.code, message: err.message, details: err.details },
     });
     return;
   }
   logger.error({ err }, 'unhandled error');
+  res.locals.errorCode = 'INTERNAL';
   res.status(500).json({ error: { code: 'INTERNAL', message: 'Internal server error' } });
 }
