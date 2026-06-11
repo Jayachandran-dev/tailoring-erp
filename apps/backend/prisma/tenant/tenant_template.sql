@@ -92,11 +92,48 @@ CREATE INDEX IF NOT EXISTS "orders_due_date_idx"
 CREATE UNIQUE INDEX IF NOT EXISTS "orders_order_number_uniq"
   ON "__SCHEMA__"."orders" ("order_number");
 
--- Per-tenant monotonically increasing order number sequence (start at 1001).
-CREATE SEQUENCE IF NOT EXISTS "__SCHEMA__"."order_number_seq" START WITH 1001 INCREMENT BY 1;
+-- Per-tenant monotonically increasing order number sequence
+CREATE SEQUENCE IF NOT EXISTS "__SCHEMA__"."order_number_seq"
+START WITH 1001 INCREMENT BY 1;
 
--- Order line items: snapshot fields so deleting/renaming a design later
--- doesn't rewrite historical orders.
+-- ============================================================
+-- DESIGN CATALOG
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS "__SCHEMA__"."design_categories" (
+  "id"         TEXT PRIMARY KEY,
+  "name"       TEXT NOT NULL,
+  "sort_order" INTEGER NOT NULL DEFAULT 0,
+  "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "design_categories_name_uniq"
+ON "__SCHEMA__"."design_categories" (LOWER("name"));
+
+CREATE TABLE IF NOT EXISTS "__SCHEMA__"."designs" (
+  "id"          TEXT PRIMARY KEY,
+  "category_id" TEXT NOT NULL REFERENCES "__SCHEMA__"."design_categories"("id") ON DELETE CASCADE,
+  "name"        TEXT NOT NULL,
+  "code"        TEXT,
+  "price_cents" INTEGER NOT NULL DEFAULT 0,
+  "notes"       TEXT,
+  "image_url"   TEXT,
+  "tags"        TEXT,
+  "created_at"  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at"  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "designs_category_id_idx"
+ON "__SCHEMA__"."designs" ("category_id");
+
+CREATE INDEX IF NOT EXISTS "designs_name_idx"
+ON "__SCHEMA__"."designs" ("name");
+
+-- ============================================================
+-- ORDER LINE ITEMS
+-- ============================================================
+
 CREATE TABLE IF NOT EXISTS "__SCHEMA__"."order_items" (
   "id"                   TEXT PRIMARY KEY,
   "order_id"             TEXT NOT NULL REFERENCES "__SCHEMA__"."orders"("id") ON DELETE CASCADE,
@@ -112,8 +149,9 @@ CREATE TABLE IF NOT EXISTS "__SCHEMA__"."order_items" (
   "sort_order"           INTEGER NOT NULL DEFAULT 0,
   "created_at"           TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
 CREATE INDEX IF NOT EXISTS "order_items_order_id_idx"
-  ON "__SCHEMA__"."order_items" ("order_id");
+ON "__SCHEMA__"."order_items" ("order_id");
 
 -- Payments against an order.
 CREATE TABLE IF NOT EXISTS "__SCHEMA__"."order_payments" (
