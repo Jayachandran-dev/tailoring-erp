@@ -27,13 +27,13 @@ export async function provisionTenantSchema(schemaName: string): Promise<void> {
   // Split on top-level semicolons but keep DO $$ ... END$$ blocks intact.
   const statements = splitSql(sql);
 
-  await platformDb.$transaction(async (tx) => {
-    for (const stmt of statements) {
-      const trimmed = stmt.trim();
-      if (!trimmed) continue;
-      await tx.$executeRawUnsafe(trimmed);
-    }
-  });
+  for (const stmt of statements) {
+    const trimmed = stmt.trim();
+
+    if (!trimmed) continue;
+
+    await platformDb.$executeRawUnsafe(trimmed);
+  }
 
   logger.info({ schemaName }, 'tenant schema provisioned');
 }
