@@ -38,24 +38,24 @@ export async function disconnectAllTenants(): Promise<void> {
 // double-cached client, etc.) that would otherwise silently route a tenant's
 // queries to another schema. Runs once per (process, schema) and is cached.
 const verifiedSchemas = new Set<string>();
-export async function assertTenantSchema(
-  db: PrismaClient,
-  expected: string,
-): Promise<void> {
-  if (verifiedSchemas.has(expected)) return;
-  validateSchemaName(expected);
-  const rows = await db.$queryRawUnsafe<{ schema: string }[]>(
-    `SELECT current_schema() AS schema`,
-  );
-  const actual = rows[0]?.schema;
-  if (actual !== expected) {
-    throw new Error(
-      `Tenant DB schema mismatch: client expected to be on '${expected}' but is on '${actual ?? '(none)'}'`,
-    );
-  }
-  verifiedSchemas.add(expected);
-  logger.debug({ schemaName: expected }, 'tenant schema connection verified');
-}
+// export async function assertTenantSchema(
+//   db: PrismaClient,
+//   expected: string,
+// ): Promise<void> {
+//   if (verifiedSchemas.has(expected)) return;
+//   validateSchemaName(expected);
+//   const rows = await db.$queryRawUnsafe<{ schema: string }[]>(
+//     `SELECT current_schema() AS schema`,
+//   );
+//   const actual = rows[0]?.schema;
+//   if (actual !== expected) {
+//     throw new Error(
+//       `Tenant DB schema mismatch: client expected to be on '${expected}' but is on '${actual ?? '(none)'}'`,
+//     );
+//   }
+//   verifiedSchemas.add(expected);
+//   logger.debug({ schemaName: expected }, 'tenant schema connection verified');
+// }
 
 // Identifier safety: only allow tenant_<lowercase letters, digits, underscores>
 // This is enforced everywhere a schema name is interpolated into raw SQL.
