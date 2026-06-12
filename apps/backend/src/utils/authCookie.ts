@@ -33,7 +33,7 @@ function baseCookieOpts(): CookieOptions {
   const isProd = env.NODE_ENV === 'production';
   return {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: isProd ? 'none' : 'lax',
     secure:   isProd,
     path:     '/',
   };
