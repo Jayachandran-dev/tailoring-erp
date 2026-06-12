@@ -44,7 +44,7 @@ export async function tenantContext(
     const db = getTenantDb(tenant.schemaName);
     // Belt-and-suspenders: confirm the cached client really points at this
     // tenant's schema. Cheap after the first call per (process, schema).
-    // await assertTenantSchema(db, tenant.schemaName);
+    await assertTenantSchema(db, tenant.schemaName);
     req.tenantDb = db;
     next();
   } catch (err) {
