@@ -16,8 +16,13 @@ export function getTenantDb(schemaName: string): PrismaClient {
 
   const cached = cache.get(schemaName);
   if (cached) return cached;
-
-  const url = `${env.DATABASE_BASE_URL}?schema=${encodeURIComponent(schemaName)}`;
+  // OLD — breaks if DATABASE_BASE_URL already has ?schema=
+  // const url = `${env.DATABASE_BASE_URL}?schema=${encodeURIComponent(schemaName)}`;
+  // NEW — safe regardless of what Render has set
+  const parsed = new URL(env.DATABASE_BASE_URL);
+  parsed.searchParams.delete('schema');
+  parsed.searchParams.set('schema', schemaName);
+  const url = parsed.toString();
   const client = new PrismaClient({
     datasources: { db: { url } },
     log: env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],

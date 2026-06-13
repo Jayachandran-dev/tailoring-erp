@@ -51,13 +51,20 @@ export async function patchAllTenantSchemas(): Promise<void> {
       validateSchemaName(t.schemaName);
       const sql = template.replaceAll('__SCHEMA__', t.schemaName);
       const stmts = splitSql(sql);
-      await platformDb.$transaction(async (tx) => {
-        for (const s of stmts) {
-          const trimmed = s.trim();
-          if (!trimmed) continue;
-          await tx.$executeRawUnsafe(trimmed);
-        }
-      });
+      // OLD — causes P2028 timeout
+      // await platformDb.$transaction(async (tx) => {
+      //   for (const s of stmts) {
+      //     const trimmed = s.trim();
+      //     if (!trimmed) continue;
+      //     await tx.$executeRawUnsafe(trimmed);
+      //   }
+      // });
+      // NEW — run DDL directly, no transaction wrapper
+      for (const s of stmts) {
+        const trimmed = s.trim();
+        if (!trimmed) continue;
+        await platformDb.$executeRawUnsafe(trimmed);
+      }
       logger.info({ schemaName: t.schemaName }, 'tenant schema patched');
     } catch (err) {
       logger.error({ err, schemaName: t.schemaName }, 'tenant patch failed');
