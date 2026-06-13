@@ -7,7 +7,7 @@
 // tenant.
 
 import { Router } from 'express';
-import { getTenantDb } from '../../db/tenantClient';
+import { getTenantDb, assertTenantSchema } from '../../db/tenantClient';
 import { platformDb } from '../../db/platformClient';
 import { notFound } from '../../utils/errors';
 import * as shareService from './share.service';

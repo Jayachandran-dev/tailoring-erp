@@ -5,7 +5,7 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import type { PrismaClient } from '../../node_modules/.prisma/tenant-client';
-import { getTenantDb } from '../db/tenantClient';
+import { getTenantDb, assertTenantSchema } from '../db/tenantClient';
 import { platformDb } from '../db/platformClient';
 import { forbidden, unauthorized } from '../utils/errors';
 
