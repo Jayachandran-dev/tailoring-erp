@@ -7,7 +7,7 @@
 // tenant.
 
 import { Router } from 'express';
-import { getTenantDb, assertTenantSchema } from '../../db/tenantClient';
+import { getTenantDb, assertTenantSchema, setTenantSearchPath } from '../../db/tenantClient';
 import { platformDb } from '../../db/platformClient';
 import { notFound } from '../../utils/errors';
 import * as shareService from './share.service';
@@ -75,6 +75,7 @@ router.get('/orders/:token', async (req, res, next) => {
     if (!tenant || tenant.status !== 'ACTIVE') throw notFound('Link not found or has been revoked');
 
     const db = getTenantDb(resolved.schemaName);
+    await setTenantSearchPath(db, resolved.schemaName);
     await assertTenantSchema(db, resolved.schemaName);
 
     const [order, business] = await Promise.all([
@@ -107,6 +108,7 @@ router.get('/orders/:token/invoice.pdf', async (req, res, next) => {
     if (!tenant || tenant.status !== 'ACTIVE') throw notFound('Link not found or has been revoked');
 
     const db = getTenantDb(resolved.schemaName);
+    await setTenantSearchPath(db, resolved.schemaName);
     await assertTenantSchema(db, resolved.schemaName);
 
     const [order, business] = await Promise.all([
