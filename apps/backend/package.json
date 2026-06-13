@@ -12,6 +12,7 @@
     "platform:generate": "prisma generate --schema=prisma/platform/schema.prisma",
     "platform:migrate": "prisma migrate dev --schema=prisma/platform/schema.prisma --name init",
     "platform:deploy": "prisma migrate deploy --schema=prisma/platform/schema.prisma",
+    "platform:baseline": "prisma migrate resolve --applied 20260528011234_init --schema=prisma/platform/schema.prisma || true && prisma migrate resolve --applied 20260528013328_add_sessions --schema=prisma/platform/schema.prisma || true && prisma migrate resolve --applied 20260529020306_staff_invites --schema=prisma/platform/schema.prisma || true && prisma migrate resolve --applied 20260529021055_audit_log --schema=prisma/platform/schema.prisma || true && prisma migrate resolve --applied 20260529023426_order_share_tokens --schema=prisma/platform/schema.prisma || true",
     "tenant:generate": "prisma generate --schema=prisma/tenant/schema.prisma",
     "postinstall": "npm run platform:generate && npm run tenant:generate"
   },
